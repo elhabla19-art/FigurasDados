@@ -21,6 +21,7 @@ class LeaderboardManager {
                 ultimaFigura: null,
                 celdasColocadas: [],
                 figuraActual: null,
+                estado: 'jugando',
                 conectado: true
             };
         } else {
@@ -87,6 +88,13 @@ class LeaderboardManager {
         return true;
     }
 
+    actualizarEstado(id, estado) {
+        if (!this.jugadores[id]) return false;
+        this.jugadores[id].estado = estado;
+        this.notificar();
+        return true;
+    }
+
     obtenerRanking() {
         var jugadoresArray = Object.values(this.jugadores)
             .filter(function(j) { return j.conectado; })
@@ -99,6 +107,7 @@ class LeaderboardManager {
                     ultimaFigura: j.ultimaFigura,
                     celdasColocadas: j.celdasColocadas || [],
                     figuraActual: j.figuraActual,
+                    estado: j.estado || 'jugando',
                     conectado: j.conectado
                 };
             });
@@ -108,7 +117,8 @@ class LeaderboardManager {
     }
 
     obtenerJugador(id) {
-        return this.jugadores[id] ? { 
+        if (!this.jugadores[id]) return null;
+        return {
             id: this.jugadores[id].id,
             nombre: this.jugadores[id].nombre,
             puntos: this.jugadores[id].puntos,
@@ -116,8 +126,9 @@ class LeaderboardManager {
             ultimaFigura: this.jugadores[id].ultimaFigura,
             celdasColocadas: this.jugadores[id].celdasColocadas || [],
             figuraActual: this.jugadores[id].figuraActual,
+            estado: this.jugadores[id].estado || 'jugando',
             conectado: this.jugadores[id].conectado
-        } : null;
+        };
     }
 
     obtenerJugadores() {
@@ -130,6 +141,7 @@ class LeaderboardManager {
                 ultimaFigura: j.ultimaFigura,
                 celdasColocadas: j.celdasColocadas || [],
                 figuraActual: j.figuraActual,
+                estado: j.estado || 'jugando',
                 conectado: j.conectado
             };
         });
@@ -147,6 +159,7 @@ class LeaderboardManager {
                     ultimaFigura: j.ultimaFigura,
                     celdasColocadas: j.celdasColocadas || [],
                     figuraActual: j.figuraActual,
+                    estado: j.estado || 'jugando',
                     conectado: j.conectado
                 };
             });
@@ -159,6 +172,7 @@ class LeaderboardManager {
             this.jugadores[id].ultimaFigura = null;
             this.jugadores[id].celdasColocadas = [];
             this.jugadores[id].figuraActual = null;
+            this.jugadores[id].estado = 'jugando';
         }
         this.notificar();
     }
@@ -173,6 +187,7 @@ class LeaderboardManager {
         return ranking.slice(0, n);
     }
 
+    // METODOS DE SUSCRIPCION
     suscribir(callback) {
         this.observers.push(callback);
     }

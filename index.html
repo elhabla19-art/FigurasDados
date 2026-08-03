@@ -64,6 +64,16 @@
         </div>
     </div>
 
+    <!-- ZOOM MODAL -->
+    <div id="zoomModal" class="modal-overlay" style="display: none;">
+        <div class="modal-box" style="max-width: 500px;">
+            <h2 id="zoomJugadorNombre">Jugador</h2>
+            <div id="zoomBoard" style="margin: 15px 0;"></div>
+            <div id="zoomInfo" style="color: var(--text-muted); font-size: 0.9rem;"></div>
+            <button class="modal-btn btn-outline" id="btnCerrarZoom">Cerrar</button>
+        </div>
+    </div>
+
     <!-- UI DEL JUEGO -->
     <header>
         <h1>Figuras Dados</h1>
@@ -72,18 +82,7 @@
 
     <div class="app-container">
         <div class="board-container">
-            <div class="board-header">
-                <span class="figura-label">Figura Objetivo</span>
-                <div class="board-controls">
-                    <button id="btnDeshacer" class="ctrl-btn">Deshacer</button>
-                    <button id="btnCompletar" class="ctrl-btn btn-completar">Completar</button>
-                </div>
-            </div>
             <div class="board" id="game-board"></div>
-            <div class="board-footer">
-                <span id="progresoFigura">Progreso: 0/0</span>
-                <span id="estadoFigura">Coloca el dado inicial</span>
-            </div>
         </div>
 
         <div class="side-panel">
@@ -96,11 +95,11 @@
                         Figuras: <span id="figuras-completadas">0</span>
                     </div>
                 </div>
+                <button class="modal-btn btn-danger" id="btnReiniciar" style="margin-top: 10px; padding: 8px; font-size: 0.8rem; width: 100%;">Reiniciar Tablero</button>
             </div>
 
-            <!-- Tabla de posiciones con mini tableros -->
             <div class="leaderboard" id="leaderboardPanel">
-                <h3>Posiciones y Tableros</h3>
+                <h3>Leaderboard</h3>
                 <div id="playersList"></div>
             </div>
         </div>

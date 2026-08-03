@@ -16,15 +16,16 @@ const lobbyModal = document.getElementById('lobbyModal');
 const joinModal = document.getElementById('joinModal');
 const loadingModal = document.getElementById('loadingModal');
 const confirmModal = document.getElementById('confirmModal');
+const zoomModal = document.getElementById('zoomModal');
 const roomInfoDisplay = document.getElementById('roomInfoDisplay');
 const gameBoard = document.getElementById('game-board');
 const playersList = document.getElementById('playersList');
 const puntosTotal = document.getElementById('puntos-total');
 const figurasCompletadas = document.getElementById('figuras-completadas');
-const progresoFigura = document.getElementById('progresoFigura');
-const estadoFigura = document.getElementById('estadoFigura');
-const btnDeshacer = document.getElementById('btnDeshacer');
-const btnCompletar = document.getElementById('btnCompletar');
+const btnReiniciar = document.getElementById('btnReiniciar');
+const zoomBoard = document.getElementById('zoomBoard');
+const zoomJugadorNombre = document.getElementById('zoomJugadorNombre');
+const zoomInfo = document.getElementById('zoomInfo');
 
 // Inicializar
 document.addEventListener('DOMContentLoaded', function() {
@@ -89,40 +90,48 @@ function configurarEventos() {
         ocultarConfirm();
     });
 
-    // Boton deshacer - ahora solo muestra mensaje
-    btnDeshacer.addEventListener('click', function() {
-        alert('Haz clic en una casilla ya marcada para desmarcarla');
+    document.getElementById('btnReiniciar').addEventListener('click', function() {
+        mostrarConfirm();
     });
 
-    btnCompletar.addEventListener('click', function() {
-        var estado = juegoManager.obtenerEstado();
-        if (!estado.completado) {
-            var completado = juegoManager.completarFigura();
-            if (completado && modoJuego === 'multi') {
-                mqttManager.publicarCompletar(myId);
-            }
+    document.getElementById('btnCerrarZoom').addEventListener('click', function() {
+        cerrarZoom();
+    });
+
+    zoomModal.addEventListener('click', function(e) {
+        if (e.target === zoomModal) {
+            cerrarZoom();
         }
     });
 }
 
 // Configurar observers
 function configurarObservers() {
-    juegoManager.suscribir(function(estado) {
-        renderizarTablero(estado);
-        actualizarUI(estado);
-    });
+    // Verificar que los managers existan antes de suscribir
+    if (juegoManager && typeof juegoManager.suscribir === 'function') {
+        juegoManager.suscribir(function(estado) {
+            renderizarTablero(estado);
+            actualizarUI(estado);
+        });
+    } else {
+        console.error('juegoManager no disponible');
+    }
     
-    leaderboardManager.suscribir(function() {
-        renderizarLeaderboard();
-    });
+    if (leaderboardManager && typeof leaderboardManager.suscribir === 'function') {
+        leaderboardManager.suscribir(function() {
+            renderizarLeaderboard();
+        });
+    } else {
+        console.error('leaderboardManager no disponible');
+    }
     
-    zoomManager.suscribir(function() {
-        renderizarZoom();
-    });
-    
-    mqttManager.suscribir(function(mensaje) {
-        manejarMensajeMQTT(mensaje);
-    });
+    if (mqttManager && typeof mqttManager.suscribir === 'function') {
+        mqttManager.suscribir(function(mensaje) {
+            manejarMensajeMQTT(mensaje);
+        });
+    } else {
+        console.error('mqttManager no disponible');
+    }
 }
 
 // Mostrar modales
@@ -131,6 +140,7 @@ function mostrarModalLobby() {
     joinModal.style.display = 'none';
     loadingModal.style.display = 'none';
     confirmModal.style.display = 'none';
+    zoomModal.style.display = 'none';
 }
 
 function mostrarModalJoin() {
@@ -154,6 +164,98 @@ function mostrarConfirm() {
 
 function ocultarConfirm() {
     confirmModal.style.display = 'none';
+}
+
+function mostrarZoom(jugadorId) {
+    var jugador = zoomManager.obtenerJugador(jugadorId);
+    if (!jugador) {
+        console.error('Jugador no encontrado:', jugadorId);
+        return;
+    }
+    
+    zoomJugadorNombre.textContent = jugador.nombre;
+    zoomBoard.innerHTML = renderizarZoomTablero(jugador);
+    
+    var progreso = jugador.progreso || 0;
+    var estado = jugador.estado || 'jugando';
+    var total = jugador.figura ? jugador.figura.celdas.length : 0;
+    var colocadas = jugador.celdasColocadas ? jugador.celdasColocadas.length : 0;
+    
+    zoomInfo.innerHTML = 'Progreso: ' + colocadas + '/' + total + ' (' + progreso + '%) - ' + 
+                         (estado === 'completado' ? 'Completado!' : 'Jugando');
+    
+    zoomModal.style.display = 'flex';
+}
+
+function cerrarZoom() {
+    zoomModal.style.display = 'none';
+}
+
+function renderizarZoomTablero(jugador) {
+    var figura = jugador.figura;
+    var celdasColocadas = jugador.celdasColocadas || [];
+    
+    if (!figura) {
+        return '<p>Esperando figura...</p>';
+    }
+    
+    var celdas = figura.celdas;
+    var xs = celdas.map(function(c) { return c.x; });
+    var ys = celdas.map(function(c) { return c.y; });
+    var minX = Math.min.apply(null, xs);
+    var maxX = Math.max.apply(null, xs);
+    var minY = Math.min.apply(null, ys);
+    var maxY = Math.max.apply(null, ys);
+    var ancho = maxX - minX + 1;
+    
+    var html = '<div class="dice-grid" style="grid-template-columns: repeat(' + ancho + ', 1fr);">';
+    
+    for (var y = minY; y <= maxY; y++) {
+        for (var x = minX; x <= maxX; x++) {
+            var celda = null;
+            for (var i = 0; i < celdas.length; i++) {
+                if (celdas[i].x === x && celdas[i].y === y) {
+                    celda = celdas[i];
+                    break;
+                }
+            }
+            
+            var colocada = false;
+            for (var j = 0; j < celdasColocadas.length; j++) {
+                if (celdasColocadas[j].x === x && celdasColocadas[j].y === y) {
+                    colocada = true;
+                    break;
+                }
+            }
+            
+            var esInicio = figura.inicio.x === x && figura.inicio.y === y;
+            var completado = jugador.estado === 'completado';
+            
+            var clases = 'dice-cell';
+            if (!celda) {
+                clases += ' vacio';
+            } else if (completado) {
+                clases += ' completado';
+            } else if (colocada) {
+                clases += ' colocado';
+            } else {
+                clases += ' disponible';
+            }
+            if (esInicio) {
+                clases += ' inicio';
+            }
+            
+            var valor = celda ? celda.valor : '';
+            html += '<div class="' + clases + '">';
+            if (celda) {
+                html += '<span class="dice-value">' + valor + '</span>';
+            }
+            html += '</div>';
+        }
+    }
+    
+    html += '</div>';
+    return html;
 }
 
 // Conectar a sala MQTT
@@ -421,14 +523,11 @@ function renderizarTablero(estado) {
     html += '</div>';
     gameBoard.innerHTML = html;
     
-    // Event listeners para celdas - permitir marcar y desmarcar
+    // Event listeners para celdas
     var celdasElementos = gameBoard.querySelectorAll('.dice-cell');
     for (var m = 0; m < celdasElementos.length; m++) {
         var el = celdasElementos[m];
-        var x = parseInt(el.dataset.x);
-        var y = parseInt(el.dataset.y);
         var colocada = el.dataset.colocada === 'true';
-        var disponible = el.dataset.disponible === 'true';
         var completado = el.dataset.completado === 'true';
         
         if (!completado) {
@@ -440,36 +539,13 @@ function renderizarTablero(estado) {
             });
         }
     }
-    
-    var progreso = juegoManager.obtenerProgreso();
-    progresoFigura.textContent = 'Progreso: ' + progreso.actual + '/' + progreso.total;
-    
-    if (completado) {
-        estadoFigura.textContent = 'Figura completada!';
-        estadoFigura.style.color = 'var(--color-success)';
-        btnCompletar.disabled = true;
-    } else {
-        var disponibles = juegoManager.obtenerCeldasDisponibles();
-        if (disponibles.length === 0 && celdasColocadas.length > 0) {
-            estadoFigura.textContent = 'No hay movimientos disponibles';
-            estadoFigura.style.color = 'var(--color-danger)';
-        } else if (celdasColocadas.length === 0) {
-            estadoFigura.textContent = 'Coloca el dado inicial';
-            estadoFigura.style.color = 'var(--color-warning)';
-        } else {
-            estadoFigura.textContent = 'Coloca en una celda disponible (' + disponibles.length + ' disponibles) o clic en una marcada para desmarcar';
-            estadoFigura.style.color = 'var(--color-primary)';
-        }
-        btnCompletar.disabled = false;
-    }
 }
 
-// Manejar click en celda - CON DESHACER POR CLIC
+// Manejar click en celda
 function handleCellClick(x, y, estaColocada) {
     var estado = juegoManager.obtenerEstado();
     if (estado.completado) return;
     
-    // Si la celda ya está colocada, la desmarcamos (DESHACER)
     if (estaColocada) {
         var success = juegoManager.deshacerCelda(x, y);
         if (success && modoJuego === 'multi') {
@@ -481,7 +557,6 @@ function handleCellClick(x, y, estaColocada) {
         return;
     }
     
-    // Si no está colocada, intentamos colocarla
     var success = juegoManager.colocarDado(x, y);
     if (success && modoJuego === 'multi') {
         mqttManager.publicarAccion('colocar', {
@@ -497,12 +572,6 @@ function actualizarUI(estado) {
         puntosTotal.textContent = jugador.puntos;
         figurasCompletadas.textContent = jugador.figurasCompletadas;
     }
-    
-    // El boton deshacer ahora muestra ayuda
-    var tieneAcciones = deshacerManager.hayAccionesJugador(myId);
-    btnDeshacer.disabled = false;
-    btnDeshacer.textContent = tieneAcciones ? 'Deshacer (clic en casilla)' : 'Sin acciones';
-    btnDeshacer.style.opacity = tieneAcciones ? '1' : '0.5';
 }
 
 function renderizarLeaderboard() {
@@ -517,24 +586,16 @@ function renderizarLeaderboard() {
     for (var i = 0; i < ranking.length; i++) {
         var jugador = ranking[i];
         var esMi = jugador.id === myId;
-        var esGanador = ranking[0] && jugador.id === ranking[0].id;
+        var estado = jugador.estado || 'jugando';
+        var estadoText = estado === 'completado' ? 'Completado' : 'Jugando';
+        var estadoClass = estado === 'completado' ? 'completado' : '';
         
         html += '<div class="player-card ' + (esMi ? 'me' : '') + '" data-player-id="' + jugador.id + '">';
-        html += '    <div class="player-card-header">';
-        html += '        <span>' + jugador.nombre + (esMi ? ' (Tu)' : '') + (esGanador ? ' 👑' : '') + '</span>';
-        html += '        <span class="puntos">' + jugador.puntos + ' pts</span>';
-        html += '    </div>';
-        html += '    <div class="mini-board">';
-        html +=         renderizarMiniTablero(jugador);
-        html += '    </div>';
-        html += '    <div class="mini-progreso">';
-        html += '        <span>Figuras: ' + (jugador.figurasCompletadas || 0) + '</span>';
-        var porcentaje = Math.min((jugador.puntos / 10) * 100, 100);
-        html += '        <div class="barra">';
-        html += '            <div class="relleno" style="width: ' + porcentaje + '%"></div>';
-        html += '        </div>';
-        html += '        <span>' + jugador.puntos + ' pts</span>';
-        html += '    </div>';
+        html += '    <span class="nombre">' + jugador.nombre + (esMi ? ' (Tu)' : '') + '</span>';
+        html += '    <span>';
+        html += '        <span class="estado ' + estadoClass + '">' + estadoText + '</span>';
+        html += '        <span class="puntos">' + jugador.puntos + '</span>';
+        html += '    </span>';
         html += '</div>';
     }
     
@@ -546,80 +607,9 @@ function renderizarLeaderboard() {
         var card = cards[j];
         card.addEventListener('click', function() {
             var id = this.dataset.playerId;
-            if (id && id !== myId) {
-                zoomManager.toggleZoom(id);
+            if (id) {
+                mostrarZoom(id);
             }
         });
-    }
-}
-
-function renderizarMiniTablero(jugador) {
-    var figura = jugador.figuraActual;
-    var celdas = jugador.celdasColocadas || [];
-    
-    if (!figura) {
-        return '<div class="mini-row">Esperando figura...</div>';
-    }
-    
-    var celdasFigura = figura.celdas || [];
-    var xs = celdasFigura.map(function(c) { return c.x; });
-    var ys = celdasFigura.map(function(c) { return c.y; });
-    var minX = Math.min.apply(null, xs);
-    var maxX = Math.max.apply(null, xs);
-    var minY = Math.min.apply(null, ys);
-    var maxY = Math.max.apply(null, ys);
-    
-    var html = '';
-    for (var y = minY; y <= maxY; y++) {
-        html += '<div class="mini-row">';
-        for (var x = minX; x <= maxX; x++) {
-            var existe = false;
-            var valor = '';
-            for (var a = 0; a < celdasFigura.length; a++) {
-                if (celdasFigura[a].x === x && celdasFigura[a].y === y) {
-                    existe = true;
-                    valor = celdasFigura[a].valor;
-                    break;
-                }
-            }
-            
-            var colocada = false;
-            for (var b = 0; b < celdas.length; b++) {
-                if (celdas[b].x === x && celdas[b].y === y) {
-                    colocada = true;
-                    break;
-                }
-            }
-            
-            var esInicio = figura.inicio && figura.inicio.x === x && figura.inicio.y === y;
-            
-            var clases = 'mini-cell';
-            if (!existe) {
-                clases += ' vacio';
-            } else if (colocada) {
-                clases += ' colocado';
-            } else {
-                clases += ' disponible';
-            }
-            if (esInicio) {
-                clases += ' inicio';
-            }
-            
-            html += '<div class="' + clases + '">' + (existe ? valor : '') + '</div>';
-        }
-        html += '</div>';
-    }
-    
-    return html;
-}
-
-function renderizarZoom() {
-    var seleccionado = zoomManager.obtenerJugadorSeleccionado();
-    var cards = document.querySelectorAll('.player-card');
-    for (var i = 0; i < cards.length; i++) {
-        var card = cards[i];
-        var isSelected = card.dataset.playerId === (seleccionado ? seleccionado.id : null);
-        card.style.borderColor = isSelected ? 'var(--color-primary)' : '';
-        card.style.borderWidth = isSelected ? '2px' : '';
     }
 }

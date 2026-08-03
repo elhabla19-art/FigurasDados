@@ -76,18 +76,52 @@ class ZoomManager {
 
     obtenerJugadorSeleccionado() {
         if (!this.jugadorSeleccionado) return null;
-        return this.jugadores[this.jugadorSeleccionado] || null;
+        return this.obtenerJugador(this.jugadorSeleccionado);
+    }
+
+    obtenerJugador(id) {
+        if (!this.jugadores[id]) return null;
+        return {
+            id: this.jugadores[id].id,
+            nombre: this.jugadores[id].nombre,
+            figura: this.jugadores[id].figura,
+            celdasColocadas: this.jugadores[id].celdasColocadas,
+            progreso: this.jugadores[id].progreso,
+            estado: this.jugadores[id].estado || 'jugando',
+            ultimaActualizacion: this.jugadores[id].ultimaActualizacion
+        };
     }
 
     obtenerJugadores() {
-        return Object.values(this.jugadores);
+        return Object.values(this.jugadores).map(function(j) {
+            return {
+                id: j.id,
+                nombre: j.nombre,
+                figura: j.figura,
+                celdasColocadas: j.celdasColocadas,
+                progreso: j.progreso,
+                estado: j.estado || 'jugando',
+                ultimaActualizacion: j.ultimaActualizacion
+            };
+        });
     }
 
     obtenerJugadoresActivos() {
         var ahora = Date.now();
         var limite = 30000;
         return Object.values(this.jugadores)
-            .filter(function(j) { return ahora - j.ultimaActualizacion < limite; });
+            .filter(function(j) { return ahora - j.ultimaActualizacion < limite; })
+            .map(function(j) {
+                return {
+                    id: j.id,
+                    nombre: j.nombre,
+                    figura: j.figura,
+                    celdasColocadas: j.celdasColocadas,
+                    progreso: j.progreso,
+                    estado: j.estado || 'jugando',
+                    ultimaActualizacion: j.ultimaActualizacion
+                };
+            });
     }
 
     obtenerProgreso(id) {
