@@ -9,10 +9,10 @@ let lobbyModal, joinModal, loadingModal, confirmModal, zoomModal;
 let roomInfoDisplay, gameBoard, playersList;
 let puntosTotal, figurasCompletadas, btnReiniciar;
 let zoomBoard, zoomJugadorNombre, zoomInfo;
+let clickHandlerAttached = false;
 
 // Inicializar UI
 function initUI() {
-    // Obtener referencias DOM
     lobbyModal = document.getElementById('lobbyModal');
     joinModal = document.getElementById('joinModal');
     loadingModal = document.getElementById('loadingModal');
@@ -27,6 +27,36 @@ function initUI() {
     zoomBoard = document.getElementById('zoomBoard');
     zoomJugadorNombre = document.getElementById('zoomJugadorNombre');
     zoomInfo = document.getElementById('zoomInfo');
+    
+    // Event delegation para el tablero - se agrega UNA SOLA VEZ
+    if (!clickHandlerAttached && gameBoard) {
+        gameBoard.addEventListener('click', function(e) {
+            // Buscar el elemento de celda más cercano
+            var cell = e.target.closest('.dice-cell');
+            if (!cell) return;
+            
+            // Verificar que no sea vacía o completada
+            if (cell.classList.contains('vacio') || cell.classList.contains('completado')) {
+                return;
+            }
+            
+            // Verificar que tenga datos de coordenadas
+            var x = parseInt(cell.dataset.x);
+            var y = parseInt(cell.dataset.y);
+            if (isNaN(x) || isNaN(y)) return;
+            
+            var colocada = cell.dataset.colocada === 'true';
+            var disponible = cell.dataset.disponible === 'true';
+            
+            // Solo permitir click si está disponible o ya colocada (para deshacer)
+            if (!disponible && !colocada) return;
+            
+            console.log('Click en celda:', x, y, 'colocada:', colocada);
+            handleCellClick(x, y, colocada);
+        });
+        clickHandlerAttached = true;
+        console.log('Event delegation para tablero configurado');
+    }
 }
 
 // Mostrar modales
@@ -61,17 +91,14 @@ function ocultarConfirm() {
     confirmModal.style.display = 'none';
 }
 
-// Renderizar tablero - MODIFICADO PARA MODO GRUPAL
+// Renderizar tablero - SIN event listeners individuales
 function renderizarTablero(estado) {
     var figuraActual = estado.figuraActual;
     var celdasColocadas = estado.celdasColocadas;
     var completado = estado.completado;
-    var modoFigura = estado.modoFigura || 'simple';
-    var myId = window.__myId || null;
-    var contribuciones = juegoManager.obtenerContribuciones() || {};
     
     if (!figuraActual) {
-        gameBoard.innerHTML = '<p>Esperando figura...</p>';
+        gameBoard.innerHTML = '<div style="text-align:center; padding: 30px; color: var(--text-muted);"><p style="font-size: 1.2rem; margin-bottom: 10px;">Esperando figura...</p><p style="font-size: 0.9rem;">Presiona "Figura Simple" o "Figura Grupal" para comenzar</p></div>';
         return;
     }
     
@@ -84,24 +111,11 @@ function renderizarTablero(estado) {
     var maxY = Math.max.apply(null, ys);
     var ancho = maxX - minX + 1;
     
-    // Construir mapa de celdas colocadas por jugador (para modo grupal)
-    var celdasPorJugador = {};
-    if (modoFigura === 'grupal') {
-        for (var jugadorId in contribuciones) {
-            celdasPorJugador[jugadorId] = {};
-            var celdasJugador = contribuciones[jugadorId] || [];
-            for (var i = 0; i < celdasJugador.length; i++) {
-                var key = celdasJugador[i].x + ',' + celdasJugador[i].y;
-                celdasPorJugador[jugadorId][key] = true;
-            }
-        }
-    }
-    
-    // Construir mapa rápido de celdas colocadas
-    var celdasColocadasMap = {};
-    for (var i = 0; i < celdasColocadas.length; i++) {
-        var key = celdasColocadas[i].x + ',' + celdasColocadas[i].y;
-        celdasColocadasMap[key] = true;
+    // Obtener celdas disponibles UNA SOLA VEZ
+    var disponibles = juegoManager.obtenerCeldasDisponibles();
+    var disponiblesSet = new Set();
+    for (var i = 0; i < disponibles.length; i++) {
+        disponiblesSet.add(disponibles[i].x + ',' + disponibles[i].y);
     }
     
     var html = '<div class="dice-grid" style="grid-template-columns: repeat(' + ancho + ', 1fr);">';
@@ -116,50 +130,28 @@ function renderizarTablero(estado) {
                 }
             }
             
-            var estaColocada = false;
-            var colocadaPorMi = false;
-            var colocadaPorOtro = false;
-            var jugadorQueColoco = null;
+            if (!celda) {
+                html += '<div class="dice-cell vacio"></div>';
+                continue;
+            }
             
-            // Verificar si está colocada y por quién (modo grupal)
-            if (modoFigura === 'grupal') {
-                for (var jugadorId in celdasPorJugador) {
-                    var key = x + ',' + y;
-                    if (celdasPorJugador[jugadorId][key]) {
-                        estaColocada = true;
-                        jugadorQueColoco = jugadorId;
-                        if (jugadorId === myId) {
-                            colocadaPorMi = true;
-                        } else {
-                            colocadaPorOtro = true;
-                        }
-                        break;
-                    }
+            var colocada = false;
+            for (var j = 0; j < celdasColocadas.length; j++) {
+                if (celdasColocadas[j].x === x && celdasColocadas[j].y === y) {
+                    colocada = true;
+                    break;
                 }
-            } else {
-                // Modo simple - usar celdasColocadas directamente
-                var key = x + ',' + y;
-                estaColocada = celdasColocadasMap[key] || false;
             }
             
             var esInicio = figuraActual.inicio.x === x && figuraActual.inicio.y === y;
-            var disponible = juegoManager.esCeldaDisponible(x, y);
+            var celdaId = x + ',' + y;
+            var disponible = !completado && !colocada && disponiblesSet.has(celdaId);
             
             var clases = 'dice-cell';
-            if (!celda) {
-                clases += ' vacio';
-            } else if (completado) {
+            if (completado) {
                 clases += ' completado';
-            } else if (estaColocada) {
-                if (modoFigura === 'grupal') {
-                    if (colocadaPorMi) {
-                        clases += ' colocado-grupal-mio';
-                    } else if (colocadaPorOtro) {
-                        clases += ' colocado-grupal';
-                    }
-                } else {
-                    clases += ' colocado';
-                }
+            } else if (colocada) {
+                clases += ' colocado';
             } else if (disponible) {
                 clases += ' disponible';
             }
@@ -168,34 +160,12 @@ function renderizarTablero(estado) {
                 clases += ' inicio';
             }
             
-            var valor = celda ? celda.valor : '';
-            var orden = 0;
-            if (celda && estaColocada) {
-                for (var k = 0; k < celdasColocadas.length; k++) {
-                    if (celdasColocadas[k].x === x && celdasColocadas[k].y === y) {
-                        orden = k + 1;
-                        break;
-                    }
-                }
-            }
-            
+            var valor = celda.valor;
             html += '<div class="' + clases + '" data-x="' + x + '" data-y="' + y + 
-                    '" data-colocada="' + estaColocada + '" data-colocada-por="' + (jugadorQueColoco || '') + '">';
-            if (celda) {
-                html += '<span class="dice-value">' + valor + '</span>';
-                if (estaColocada && orden > 0 && modoFigura !== 'grupal') {
-                    html += '<span class="dice-orden">' + orden + '</span>';
-                }
-                if (esInicio) {
-                    html += '<span class="dice-indice">I</span>';
-                }
-                // Mostrar badge de quién colocó en modo grupal
-                if (modoFigura === 'grupal' && estaColocada && jugadorQueColoco) {
-                    var nombreJugador = leaderboardManager.obtenerJugador(jugadorQueColoco);
-                    var inicial = nombreJugador ? nombreJugador.nombre.charAt(0).toUpperCase() : '?';
-                    var badgeClass = colocadaPorMi ? '' : 'grupal';
-                    html += '<span class="contribucion-badge ' + badgeClass + '" title="' + (nombreJugador ? nombreJugador.nombre : 'Desconocido') + '">' + inicial + '</span>';
-                }
+                    '" data-colocada="' + colocada + '" data-disponible="' + disponible + '">';
+            html += '<span class="dice-value">' + valor + '</span>';
+            if (esInicio) {
+                html += '<span class="dice-indice">I</span>';
             }
             html += '</div>';
         }
@@ -203,24 +173,6 @@ function renderizarTablero(estado) {
     
     html += '</div>';
     gameBoard.innerHTML = html;
-    
-    // Event listeners para celdas - usar handleCellClick importado
-    var celdasElementos = gameBoard.querySelectorAll('.dice-cell');
-    for (var m = 0; m < celdasElementos.length; m++) {
-        var el = celdasElementos[m];
-        var colocada = el.dataset.colocada === 'true';
-        var completado2 = el.classList.contains('completado');
-        var vacio = el.classList.contains('vacio');
-        
-        if (!completado2 && !vacio) {
-            el.addEventListener('click', function() {
-                var x = parseInt(this.dataset.x);
-                var y = parseInt(this.dataset.y);
-                var colocada = this.dataset.colocada === 'true';
-                handleCellClick(x, y, colocada);
-            });
-        }
-    }
 }
 
 function actualizarUI(estado) {
@@ -229,27 +181,11 @@ function actualizarUI(estado) {
         puntosTotal.textContent = jugador.puntos;
         figurasCompletadas.textContent = jugador.figurasCompletadas;
     }
-    
-    // Mostrar modo de juego
-    var modoFigura = estado.modoFigura || 'simple';
-    var puntuacionSection = document.querySelector('.puntuacion-section');
-    if (puntuacionSection) {
-        var puntosElement = document.getElementById('puntos-total');
-        if (puntosElement) {
-            if (modoFigura === 'grupal') {
-                puntosElement.className = 'puntos-total modo-grupal';
-            } else {
-                puntosElement.className = 'puntos-total';
-            }
-        }
-    }
 }
 
 function renderizarLeaderboard() {
     var ranking = leaderboardManager.obtenerRanking();
     var myId = window.__myId || null;
-    var esModoGrupal = juegoManager.modoFigura === 'grupal';
-    var contribuciones = juegoManager.obtenerContribuciones() || {};
     
     if (ranking.length === 0) {
         playersList.innerHTML = '<p style="text-align:center;color:var(--text-muted);">Esperando jugadores...</p>';
@@ -261,22 +197,14 @@ function renderizarLeaderboard() {
         var jugador = ranking[i];
         var esMi = jugador.id === myId;
         var estado = jugador.estado || 'jugando';
-        var estadoText = estado === 'completado' ? '✓ Completado' : '● Jugando';
+        var estadoText = estado === 'completado' ? 'Completado' : 'Jugando';
         var estadoClass = estado === 'completado' ? 'completado' : '';
-        
-        // En modo grupal, mostrar contribuciones
-        var contribs = contribuciones[jugador.id] || [];
-        var contribText = '';
-        if (esModoGrupal) {
-            contribText = ' <span class="contribuciones">(' + contribs.length + ' celdas)</span>';
-        }
         
         html += '<div class="player-card ' + (esMi ? 'me' : '') + '" data-player-id="' + jugador.id + '">';
         html += '    <span class="nombre">' + jugador.nombre + (esMi ? ' (Tu)' : '') + '</span>';
         html += '    <span>';
         html += '        <span class="estado ' + estadoClass + '">' + estadoText + '</span>';
-        html += '        <span class="puntos' + (esModoGrupal ? ' grupal' : '') + '">' + jugador.puntos + '</span>';
-        html += contribText;
+        html += '        <span class="puntos">' + jugador.puntos + '</span>';
         html += '    </span>';
         html += '</div>';
     }
@@ -294,7 +222,6 @@ function renderizarLeaderboard() {
                     alert('Este es tu tablero. Puedes verlo en la pantalla principal.');
                     return;
                 }
-                // Mostrar zoom directamente
                 mostrarZoom(id);
             }
         });

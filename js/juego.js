@@ -17,14 +17,14 @@ class JuegoManager {
         this.observers = [];
         this.modo = 'solo';
         this.salaId = null;
-        this.modoFigura = 'simple'; // 'simple' o 'grupal'
-        this.figuraCompartida = null; // Para modo grupal
-        this.celdasGrupales = []; // Para modo grupal
-        this.jugadoresCeldas = {}; // Para modo simple (tracking por jugador)
-        this.contribuciones = {}; // Para modo grupal (quién puso qué celda)
+        this.modoFigura = 'simple';
+        this.figuraCompartida = null;
+        this.celdasGrupales = [];
+        this.jugadoresCeldas = {};
+        this.contribuciones = {};
+        this.puntosPorCelda = {};
     }
 
-    // Iniciar sin figura (estado vacío)
     iniciarVacio(jugadorId) {
         this.estado.jugadorId = jugadorId;
         this.estado.figuraActual = null;
@@ -37,6 +37,7 @@ class JuegoManager {
         this.celdasGrupales = [];
         this.jugadoresCeldas = {};
         this.contribuciones = {};
+        this.puntosPorCelda = {};
         
         deshacerManager.limpiarHistorialJugador(jugadorId);
         
@@ -47,57 +48,22 @@ class JuegoManager {
         return null;
     }
 
-    // Iniciar ronda normal (individual)
-    iniciarRonda(jugadorId) {
-        this.estado.jugadorId = jugadorId;
-        this.estado.figuraActual = generarFigura('simple');
-        this.estado.celdasColocadas = [];
-        this.estado.completado = false;
-        this.estado.ronda += 1;
-        this.estado.enJuego = true;
+    // ===== CORREGIDO: Usa figuraRecibida si existe =====
+    iniciarModoSimple(jugadorId, figuraRecibida) {
         this.modoFigura = 'simple';
-        this.figuraCompartida = this.estado.figuraActual;
-        
-        // Inicializar celdas del jugador
-        if (!this.jugadoresCeldas[jugadorId]) {
-            this.jugadoresCeldas[jugadorId] = [];
-        }
-        this.jugadoresCeldas[jugadorId] = [];
-        this.estado.celdasColocadas = this.jugadoresCeldas[jugadorId];
         this.celdasGrupales = [];
         this.contribuciones = {};
+        this.puntosPorCelda = {};
+        this.figuraCompartida = null;
         
-        deshacerManager.limpiarHistorialJugador(jugadorId);
-        
-        leaderboardManager.actualizarFigura(jugadorId, this.estado.figuraActual);
-        leaderboardManager.actualizarCeldas(jugadorId, []);
-        
-        zoomManager.actualizarJugador(jugadorId, {
-            figura: this.estado.figuraActual,
-            celdasColocadas: [],
-            estado: 'jugando'
-        });
-        
-        this.notificar();
-        return this.estado.figuraActual;
-    }
-
-    // Iniciar modo simple (figura compartida visualmente, llenado individual)
-    iniciarModoSimple(jugadorId, figura) {
-        this.modoFigura = 'simple';
         this.estado.jugadorId = jugadorId;
-        this.estado.figuraActual = figura || generarFigura('simple');
+        // USA la figura recibida si existe, si no genera una nueva
+        this.estado.figuraActual = figuraRecibida || generarFigura('simple');
         this.estado.celdasColocadas = [];
         this.estado.completado = false;
         this.estado.ronda += 1;
         this.estado.enJuego = true;
         
-        // Guardar figura compartida
-        this.figuraCompartida = this.estado.figuraActual;
-        this.celdasGrupales = [];
-        this.contribuciones = {};
-        
-        // Inicializar celdas por jugador
         if (!this.jugadoresCeldas[jugadorId]) {
             this.jugadoresCeldas[jugadorId] = [];
         }
@@ -118,55 +84,81 @@ class JuegoManager {
         return this.estado.figuraActual;
     }
 
-    // Iniciar modo grupal (figura compartida y llenado compartido)
-    iniciarModoGrupal(jugadorId, figura) {
+    // ===== CORREGIDO: Usa figuraRecibida si existe =====
+    iniciarModoGrupal(jugadorId, figuraRecibida) {
         this.modoFigura = 'grupal';
+        this.celdasGrupales = [];
+        this.contribuciones = {};
+        this.puntosPorCelda = {};
+        this.figuraCompartida = null;
+        this.estado.celdasColocadas = [];
+        
+        // USA la figura recibida si existe, si no genera una nueva
+        var nuevaFigura = figuraRecibida || generarFigura('grupal');
+        
         this.estado.jugadorId = jugadorId;
-        
-        // Si no se proporciona figura, generar una nueva SOLO si no hay una ya activa
-        if (!figura && !this.figuraCompartida) {
-            this.figuraCompartida = generarFigura('grupal');
-        } else if (figura) {
-            this.figuraCompartida = figura;
-        }
-        
-        // Si ya hay una figura compartida, usarla
-        if (this.figuraCompartida) {
-            this.estado.figuraActual = this.figuraCompartida;
-        } else {
-            this.estado.figuraActual = generarFigura('grupal');
-            this.figuraCompartida = this.estado.figuraActual;
-        }
-        
-        this.estado.celdasColocadas = this.celdasGrupales; // Usar celdas compartidas
+        this.estado.figuraActual = nuevaFigura;
         this.estado.completado = false;
         this.estado.ronda += 1;
         this.estado.enJuego = true;
         
-        // Limpiar celdas grupales si es una nueva figura
-        if (!figura) {
-            this.celdasGrupales = [];
-            this.contribuciones = {};
+        this.figuraCompartida = this.estado.figuraActual;
+        this.estado.celdasColocadas = this.celdasGrupales;
+        this.jugadoresCeldas = {};
+        
+        deshacerManager.limpiarHistorialJugador(jugadorId);
+        
+        leaderboardManager.actualizarFigura(jugadorId, this.estado.figuraActual);
+        leaderboardManager.actualizarCeldas(jugadorId, []);
+        
+        var todosLosJugadores = leaderboardManager.obtenerJugadores();
+        for (var i = 0; i < todosLosJugadores.length; i++) {
+            var jugador = todosLosJugadores[i];
+            leaderboardManager.establecerPuntuacion(jugador.id, 0);
+            this.puntosPorCelda[jugador.id] = 0;
         }
         
+        zoomManager.actualizarJugador(jugadorId, {
+            figura: this.estado.figuraActual,
+            celdasColocadas: [],
+            estado: 'jugando'
+        });
+        
+        this.notificar();
+        return this.estado.figuraActual;
+    }
+
+    sincronizarCeldasGrupales(celdas, contribuciones, figura) {
+        if (this.modoFigura !== 'grupal') return;
+        
+        console.log('sincronizarCeldasGrupales: actualizando', celdas ? celdas.length : 0, 'celdas');
+        
+        // Si se proporciona una figura, actualizarla
+        if (figura) {
+            this.estado.figuraActual = clonarObjeto(figura);
+            this.figuraCompartida = clonarObjeto(figura);
+        }
+        
+        // Actualizar celdas grupales
+        this.celdasGrupales = clonarObjeto(celdas || []);
         this.estado.celdasColocadas = this.celdasGrupales;
         
-        deshacerManager.limpiarHistorialJugador(jugadorId);
+        if (contribuciones) {
+            this.contribuciones = clonarObjeto(contribuciones);
+        }
         
-        leaderboardManager.actualizarFigura(jugadorId, this.estado.figuraActual);
-        leaderboardManager.actualizarCeldas(jugadorId, this.celdasGrupales);
-        
-        zoomManager.actualizarJugador(jugadorId, {
-            figura: this.estado.figuraActual,
-            celdasColocadas: this.celdasGrupales,
-            estado: 'jugando'
-        });
+        // Verificar si está completada
+        var totalCeldas = this.estado.figuraActual ? this.estado.figuraActual.celdas.length : 0;
+        if (this.celdasGrupales.length === totalCeldas && totalCeldas > 0) {
+            if (!this.estado.completado) {
+                console.log('sincronizarCeldasGrupales: figura completada');
+                this.estado.completado = true;
+            }
+        }
         
         this.notificar();
-        return this.estado.figuraActual;
     }
 
-    // Colocar un dado en una celda
     colocarDado(x, y) {
         if (!this.estado.enJuego || this.estado.completado) return false;
         
@@ -175,130 +167,90 @@ class JuegoManager {
         
         var nuevaCelda = { x: x, y: y, valor: valor };
         
-        // En modo grupal, verificar en celdasGrupales (compartidas)
-        var yaColocada = this.celdasGrupales.some(function(c) { 
-            return c.x === x && c.y === y; 
-        });
+        var yaColocada = false;
+        if (this.modoFigura === 'grupal') {
+            yaColocada = this.celdasGrupales.some(function(c) { 
+                return c.x === x && c.y === y; 
+            });
+        } else {
+            var celdasJugador = this.jugadoresCeldas[this.estado.jugadorId] || [];
+            yaColocada = celdasJugador.some(function(c) { 
+                return c.x === x && c.y === y; 
+            });
+        }
         
         if (yaColocada) return false;
         
-        // Verificar si es adyacente al inicio o a celdas ya colocadas
-        if (this.celdasGrupales.length === 0) {
+        var celdasExistentes = this.modoFigura === 'grupal' ? 
+            this.celdasGrupales : 
+            (this.jugadoresCeldas[this.estado.jugadorId] || []);
+        
+        if (celdasExistentes.length === 0) {
             var inicio = this.estado.figuraActual.inicio;
             if (x !== inicio.x || y !== inicio.y) return false;
         } else {
-            var esAdyacente = this.celdasGrupales.some(function(c) {
+            var esAdyacente = celdasExistentes.some(function(c) {
                 return Math.abs(c.x - x) + Math.abs(c.y - y) === 1;
             });
             if (!esAdyacente) return false;
         }
         
-        // Colocar la celda en las celdas grupales (compartidas)
-        this.celdasGrupales.push(nuevaCelda);
-        this.estado.celdasColocadas = this.celdasGrupales;
-        
-        // Registrar contribución del jugador
-        if (!this.contribuciones[this.estado.jugadorId]) {
-            this.contribuciones[this.estado.jugadorId] = [];
+        if (this.modoFigura === 'grupal') {
+            this.celdasGrupales.push(nuevaCelda);
+            this.estado.celdasColocadas = this.celdasGrupales;
+            
+            if (!this.contribuciones[this.estado.jugadorId]) {
+                this.contribuciones[this.estado.jugadorId] = [];
+            }
+            this.contribuciones[this.estado.jugadorId].push(nuevaCelda);
+            
+            // 1 PUNTO POR CELDA COLOCADA
+            if (!this.puntosPorCelda[this.estado.jugadorId]) {
+                this.puntosPorCelda[this.estado.jugadorId] = 0;
+            }
+            this.puntosPorCelda[this.estado.jugadorId] += 1;
+            leaderboardManager.establecerPuntuacion(this.estado.jugadorId, this.puntosPorCelda[this.estado.jugadorId]);
+            
+        } else {
+            if (!this.jugadoresCeldas[this.estado.jugadorId]) {
+                this.jugadoresCeldas[this.estado.jugadorId] = [];
+            }
+            this.jugadoresCeldas[this.estado.jugadorId].push(nuevaCelda);
+            this.estado.celdasColocadas = this.jugadoresCeldas[this.estado.jugadorId];
         }
-        this.contribuciones[this.estado.jugadorId].push(nuevaCelda);
         
-        // Registrar en deshacer
         deshacerManager.pushAccion({
             tipo: 'colocar',
             jugadorId: this.estado.jugadorId,
             celda: { x: nuevaCelda.x, y: nuevaCelda.y, valor: nuevaCelda.valor },
             figuraId: this.estado.figuraActual.id,
-            modo: 'grupal'
+            modo: this.modoFigura
         });
         
-        // Verificar si se completó
         var totalCeldas = this.estado.figuraActual.celdas.length;
-        if (this.celdasGrupales.length === totalCeldas) {
+        var celdasActuales = this.modoFigura === 'grupal' ? 
+            this.celdasGrupales : 
+            (this.jugadoresCeldas[this.estado.jugadorId] || []);
+        
+        if (celdasActuales.length === totalCeldas) {
             this.completarFigura();
         }
         
-        // Actualizar leaderboard con puntos por contribuciones
-        var contribuciones = this.contribuciones[this.estado.jugadorId] || [];
-        leaderboardManager.establecerPuntuacion(this.estado.jugadorId, contribuciones.length);
-        leaderboardManager.actualizarCeldas(this.estado.jugadorId, this.celdasGrupales);
+        var celdasParaLeaderboard = this.modoFigura === 'grupal' ?
+            this.celdasGrupales :
+            (this.jugadoresCeldas[this.estado.jugadorId] || []);
+        
+        leaderboardManager.actualizarCeldas(this.estado.jugadorId, celdasParaLeaderboard);
         
         zoomManager.actualizarJugador(this.estado.jugadorId, {
-            celdasColocadas: this.celdasGrupales,
+            celdasColocadas: celdasParaLeaderboard,
             estado: this.estado.completado ? 'completado' : 'jugando'
-        });
-        
-        this.notificar();
-        
-        // RETORNAR LA CELDA PARA PUBLICARLA
-        return nuevaCelda;
-    }
-
-    // Deshacer una celda específica
-    deshacerCelda(x, y) {
-        if (!this.estado.enJuego || this.estado.completado) return false;
-        
-        // En modo grupal, verificar en celdasGrupales
-        var index = -1;
-        for (var i = 0; i < this.celdasGrupales.length; i++) {
-            if (this.celdasGrupales[i].x === x && this.celdasGrupales[i].y === y) {
-                index = i;
-                break;
-            }
-        }
-        
-        if (index === -1) return false;
-        
-        // Solo se puede deshacer la ULTIMA celda colocada
-        if (index !== this.celdasGrupales.length - 1) {
-            return false;
-        }
-        
-        // Remover la celda
-        var celdaRemovida = this.celdasGrupales.pop();
-        
-        // En modo grupal, también remover de contribuciones
-        for (var jugadorId in this.contribuciones) {
-            var contribs = this.contribuciones[jugadorId];
-            for (var j = contribs.length - 1; j >= 0; j--) {
-                if (contribs[j].x === x && contribs[j].y === y) {
-                    contribs.splice(j, 1);
-                    // Actualizar puntuación del jugador
-                    leaderboardManager.establecerPuntuacion(jugadorId, contribs.length);
-                    break;
-                }
-            }
-        }
-        this.estado.celdasColocadas = this.celdasGrupales;
-        
-        // Eliminar del historial de deshacer
-        var acciones = deshacerManager.obtenerHistorialJugador(this.estado.jugadorId);
-        for (var j = acciones.length - 1; j >= 0; j--) {
-            if (acciones[j].tipo === 'colocar' && 
-                acciones[j].celda.x === x && 
-                acciones[j].celda.y === y) {
-                var historialCompleto = deshacerManager.obtenerHistorial();
-                for (var k = 0; k < historialCompleto.length; k++) {
-                    if (historialCompleto[k].id === acciones[j].id) {
-                        historialCompleto.splice(k, 1);
-                        break;
-                    }
-                }
-                break;
-            }
-        }
-        
-        // Actualizar leaderboard y zoom
-        leaderboardManager.actualizarCeldas(this.estado.jugadorId, this.celdasGrupales);
-        zoomManager.actualizarJugador(this.estado.jugadorId, {
-            celdasColocadas: this.celdasGrupales
         });
         
         this.notificar();
         return true;
     }
 
-    // Obtener el valor de una celda en la figura actual
     obtenerValorCelda(x, y) {
         if (!this.estado.figuraActual) return null;
         var celda = null;
@@ -311,23 +263,28 @@ class JuegoManager {
         return celda ? celda.valor : null;
     }
 
-    // Completar la figura actual
     completarFigura() {
         if (this.estado.completado) return false;
         
         this.estado.completado = true;
         
+        var celdasActuales = this.modoFigura === 'grupal' ?
+            this.celdasGrupales :
+            (this.jugadoresCeldas[this.estado.jugadorId] || []);
+        
         deshacerManager.pushAccion({
             tipo: 'completar',
             jugadorId: this.estado.jugadorId,
             figuraId: this.estado.figuraActual.id,
-            celdas: this.celdasGrupales.slice(),
-            modo: 'grupal'
+            celdas: celdasActuales.slice(),
+            modo: this.modoFigura
         });
         
-        // En modo grupal, los puntos ya se actualizan por contribución
-        // pero podemos dar un bonus al que completa
-        leaderboardManager.actualizarPuntuacion(this.estado.jugadorId, 2);
+        // SOLO EN MODO SIMPLE: 1 punto por completar
+        if (this.modoFigura === 'simple') {
+            leaderboardManager.actualizarPuntuacion(this.estado.jugadorId, 1);
+        }
+        // En modo grupal NO se da punto extra por completar
         
         zoomManager.actualizarJugador(this.estado.jugadorId, {
             estado: 'completado'
@@ -337,21 +294,12 @@ class JuegoManager {
         return true;
     }
 
-    /**
-     * Marcar la figura como completada remotamente (cuando otro jugador completa)
-     * Esto permite que todos los jugadores sepan que la ronda terminó
-     */
     marcarCompletadoRemoto() {
-        // Si ya está completado localmente, no hacer nada
         if (this.estado.completado) return true;
-        
-        // Si no hay figura activa, no hacer nada
         if (!this.estado.figuraActual) return false;
         
-        // Marcar como completado
         this.estado.completado = true;
         
-        // Registrar en deshacer
         deshacerManager.pushAccion({
             tipo: 'completar_remoto',
             jugadorId: this.estado.jugadorId,
@@ -360,56 +308,99 @@ class JuegoManager {
             timestamp: Date.now()
         });
         
-        // Actualizar zoom
         zoomManager.actualizarJugador(this.estado.jugadorId, {
             estado: 'completado'
         });
         
-        // Notificar a todos los observers (UI se actualizará)
         this.notificar();
-        
         return true;
     }
 
-    // Deshacer la última acción (método legacy)
-    deshacer() {
+    deshacerCelda(x, y) {
         if (!this.estado.enJuego || this.estado.completado) return false;
         
-        var accion = deshacerManager.deshacerJugador(this.estado.jugadorId);
-        if (!accion) return false;
+        var celdasActuales = this.modoFigura === 'grupal' ?
+            this.celdasGrupales :
+            (this.jugadoresCeldas[this.estado.jugadorId] || []);
         
-        if (accion.tipo === 'colocar') {
-            var index = -1;
-            for (var i = 0; i < this.celdasGrupales.length; i++) {
-                if (this.celdasGrupales[i].x === accion.celda.x && 
-                    this.celdasGrupales[i].y === accion.celda.y) {
-                    index = i;
-                    break;
-                }
+        var index = -1;
+        for (var i = 0; i < celdasActuales.length; i++) {
+            if (celdasActuales[i].x === x && celdasActuales[i].y === y) {
+                index = i;
+                break;
             }
-            if (index !== -1) {
-                this.celdasGrupales.splice(index, 1);
-            }
-            
-            this.estado.celdasColocadas = this.celdasGrupales;
-            
-            leaderboardManager.actualizarCeldas(this.estado.jugadorId, this.celdasGrupales);
-            zoomManager.actualizarJugador(this.estado.jugadorId, {
-                celdasColocadas: this.celdasGrupales
-            });
-            
-            this.notificar();
-            return true;
         }
         
-        return false;
+        if (index === -1) return false;
+        if (index !== celdasActuales.length - 1) return false;
+        
+        var celdaRemovida = celdasActuales.pop();
+        
+        if (this.modoFigura === 'grupal') {
+            for (var jugadorId in this.contribuciones) {
+                var contribs = this.contribuciones[jugadorId];
+                for (var j = contribs.length - 1; j >= 0; j--) {
+                    if (contribs[j].x === x && contribs[j].y === y) {
+                        contribs.splice(j, 1);
+                        if (this.puntosPorCelda[jugadorId]) {
+                            this.puntosPorCelda[jugadorId] -= 1;
+                            leaderboardManager.establecerPuntuacion(jugadorId, this.puntosPorCelda[jugadorId]);
+                        }
+                        break;
+                    }
+                }
+            }
+            this.estado.celdasColocadas = this.celdasGrupales;
+        } else {
+            this.estado.celdasColocadas = this.jugadoresCeldas[this.estado.jugadorId] || [];
+        }
+        
+        var acciones = deshacerManager.obtenerHistorialJugador(this.estado.jugadorId);
+        for (var k = acciones.length - 1; k >= 0; k--) {
+            if (acciones[k].tipo === 'colocar' && 
+                acciones[k].celda.x === x && 
+                acciones[k].celda.y === y) {
+                var historialCompleto = deshacerManager.obtenerHistorial();
+                for (var h = 0; h < historialCompleto.length; h++) {
+                    if (historialCompleto[h].id === acciones[k].id) {
+                        historialCompleto.splice(h, 1);
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+        
+        var celdasActualizadas = this.modoFigura === 'grupal' ?
+            this.celdasGrupales :
+            (this.jugadoresCeldas[this.estado.jugadorId] || []);
+        
+        leaderboardManager.actualizarCeldas(this.estado.jugadorId, celdasActualizadas);
+        zoomManager.actualizarJugador(this.estado.jugadorId, {
+            celdasColocadas: celdasActualizadas
+        });
+        
+        this.notificar();
+        return true;
     }
 
-    // Reiniciar el tablero (limpiar celdas)
     reiniciarTablero() {
-        this.celdasGrupales = [];
-        this.estado.celdasColocadas = this.celdasGrupales;
-        this.contribuciones = {};
+        if (this.modoFigura === 'grupal') {
+            this.celdasGrupales = [];
+            this.estado.celdasColocadas = this.celdasGrupales;
+            this.contribuciones = {};
+            this.puntosPorCelda = {};
+            var todosLosJugadores = leaderboardManager.obtenerJugadores();
+            for (var i = 0; i < todosLosJugadores.length; i++) {
+                leaderboardManager.establecerPuntuacion(todosLosJugadores[i].id, 0);
+            }
+        } else {
+            if (this.jugadoresCeldas[this.estado.jugadorId]) {
+                this.jugadoresCeldas[this.estado.jugadorId] = [];
+            }
+            this.estado.celdasColocadas = this.jugadoresCeldas[this.estado.jugadorId] || [];
+        }
+        
         this.estado.completado = false;
         
         deshacerManager.limpiarHistorialJugador(this.estado.jugadorId);
@@ -423,13 +414,16 @@ class JuegoManager {
         this.notificar();
     }
 
-    // Obtener celdas disponibles
     obtenerCeldasDisponibles() {
         if (!this.estado.figuraActual) return [];
         
+        var celdasActuales = this.modoFigura === 'grupal' ?
+            this.celdasGrupales :
+            (this.jugadoresCeldas[this.estado.jugadorId] || []);
+        
         var figura = this.estado.figuraActual;
         var disponibles = [];
-        var colocadasIds = new Set(this.celdasGrupales.map(function(c) { 
+        var colocadasIds = new Set(celdasActuales.map(function(c) { 
             return c.x + ',' + c.y; 
         }));
         
@@ -438,14 +432,12 @@ class JuegoManager {
             var id = celda.x + ',' + celda.y;
             if (colocadasIds.has(id)) continue;
             
-            if (this.celdasGrupales.length === 0) {
-                // Primera celda debe ser el inicio
+            if (celdasActuales.length === 0) {
                 if (celda.x === figura.inicio.x && celda.y === figura.inicio.y) {
                     disponibles.push({ x: celda.x, y: celda.y, valor: celda.valor });
                 }
             } else {
-                // Debe ser adyacente a alguna colocada
-                var esAdyacente = this.celdasGrupales.some(function(c) {
+                var esAdyacente = celdasActuales.some(function(c) {
                     return Math.abs(c.x - celda.x) + Math.abs(c.y - celda.y) === 1;
                 });
                 if (esAdyacente) {
@@ -457,13 +449,16 @@ class JuegoManager {
         return disponibles;
     }
 
-    // Obtener progreso actual
     obtenerProgreso() {
         if (!this.estado.figuraActual) return { actual: 0, total: 0, porcentaje: 0 };
-        return obtenerProgreso(this.estado.figuraActual, this.celdasGrupales);
+        
+        var celdasActuales = this.modoFigura === 'grupal' ?
+            this.celdasGrupales :
+            (this.jugadoresCeldas[this.estado.jugadorId] || []);
+        
+        return obtenerProgreso(this.estado.figuraActual, celdasActuales);
     }
 
-    // Verificar si una celda está disponible
     esCeldaDisponible(x, y) {
         var disponibles = this.obtenerCeldasDisponibles();
         for (var i = 0; i < disponibles.length; i++) {
@@ -474,22 +469,28 @@ class JuegoManager {
         return false;
     }
 
-    // Verificar si una celda está colocada
     esCeldaColocada(x, y) {
-        for (var i = 0; i < this.celdasGrupales.length; i++) {
-            if (this.celdasGrupales[i].x === x && this.celdasGrupales[i].y === y) {
+        var celdasActuales = this.modoFigura === 'grupal' ?
+            this.celdasGrupales :
+            (this.jugadoresCeldas[this.estado.jugadorId] || []);
+        
+        for (var i = 0; i < celdasActuales.length; i++) {
+            if (celdasActuales[i].x === x && celdasActuales[i].y === y) {
                 return true;
             }
         }
         return false;
     }
 
-    // Obtener el estado actual del juego
     obtenerEstado() {
+        var celdasActuales = this.modoFigura === 'grupal' ?
+            this.celdasGrupales :
+            (this.jugadoresCeldas[this.estado.jugadorId] || []);
+        
         return {
             jugadorId: this.estado.jugadorId,
             figuraActual: this.estado.figuraActual,
-            celdasColocadas: this.celdasGrupales.slice(),
+            celdasColocadas: celdasActuales.slice(),
             completado: this.estado.completado,
             ronda: this.estado.ronda,
             enJuego: this.estado.enJuego,
@@ -499,34 +500,33 @@ class JuegoManager {
         };
     }
 
-    // Obtener contribuciones por jugador (modo grupal)
     obtenerContribuciones() {
         if (this.modoFigura !== 'grupal') return {};
         return this.contribuciones;
     }
 
-    // Obtener celdas grupales (modo grupal)
+    obtenerPuntosPorCelda() {
+        if (this.modoFigura !== 'grupal') return {};
+        return this.puntosPorCelda;
+    }
+
     obtenerCeldasGrupales() {
         return this.celdasGrupales.slice();
     }
 
-    // Establecer el modo de juego
     setModo(modo, salaId) {
         this.modo = modo;
         this.salaId = salaId || null;
     }
 
-    // Suscribir observer
     suscribir(callback) {
         this.observers.push(callback);
     }
 
-    // Desuscribir observer
     desuscribir(callback) {
         this.observers = this.observers.filter(function(cb) { return cb !== callback; });
     }
 
-    // Notificar a todos los observers
     notificar() {
         var data = this.obtenerEstado();
         for (var i = 0; i < this.observers.length; i++) {
@@ -534,24 +534,26 @@ class JuegoManager {
         }
     }
 
-    // Exportar estado
     exportarEstado() {
         return clonarObjeto(this.estado);
     }
 
-    // Importar estado
     importarEstado(estado) {
         this.estado = clonarObjeto(estado);
         this.notificar();
     }
 
-    // Sincronizar con datos externos
     sincronizar(datos) {
         if (datos.jugadorId) this.estado.jugadorId = datos.jugadorId;
         if (datos.figuraActual) this.estado.figuraActual = clonarObjeto(datos.figuraActual);
         if (datos.celdasColocadas) {
-            this.celdasGrupales = clonarObjeto(datos.celdasColocadas);
-            this.estado.celdasColocadas = this.celdasGrupales;
+            if (this.modoFigura === 'grupal') {
+                this.celdasGrupales = clonarObjeto(datos.celdasColocadas);
+                this.estado.celdasColocadas = this.celdasGrupales;
+            } else {
+                this.jugadoresCeldas[this.estado.jugadorId] = clonarObjeto(datos.celdasColocadas);
+                this.estado.celdasColocadas = this.jugadoresCeldas[this.estado.jugadorId];
+            }
         }
         if (datos.completado !== undefined) this.estado.completado = datos.completado;
         if (datos.ronda) this.estado.ronda = datos.ronda;
@@ -559,91 +561,8 @@ class JuegoManager {
         
         this.notificar();
     }
-
-    // Método para agregar una celda remota (desde MQTT)
-    agregarCeldaRemota(jugadorId, celda) {
-        if (this.modoFigura !== 'grupal') return false;
-        
-        // Verificar si ya está colocada
-        var yaColocada = this.celdasGrupales.some(function(c) {
-            return c.x === celda.x && c.y === celda.y;
-        });
-        
-        if (yaColocada) return false;
-        
-        // Agregar la celda
-        this.celdasGrupales.push(celda);
-        this.estado.celdasColocadas = this.celdasGrupales;
-        
-        // Registrar contribución del otro jugador
-        if (!this.contribuciones[jugadorId]) {
-            this.contribuciones[jugadorId] = [];
-        }
-        this.contribuciones[jugadorId].push(celda);
-        
-        // Actualizar leaderboard del otro jugador
-        var contribs = this.contribuciones[jugadorId] || [];
-        leaderboardManager.establecerPuntuacion(jugadorId, contribs.length);
-        leaderboardManager.actualizarCeldas(jugadorId, this.celdasGrupales);
-        
-        // Verificar si se completó
-        var totalCeldas = this.estado.figuraActual.celdas.length;
-        if (this.celdasGrupales.length === totalCeldas) {
-            this.completarFigura();
-        }
-        
-        // Actualizar zoom
-        zoomManager.actualizarJugador(jugadorId, {
-            celdasColocadas: this.celdasGrupales,
-            estado: this.estado.completado ? 'completado' : 'jugando'
-        });
-        
-        this.notificar();
-        return true;
-    }
-
-    // Método para remover una celda remota (desde MQTT)
-    removerCeldaRemota(jugadorId, celda) {
-        if (this.modoFigura !== 'grupal') return false;
-        
-        // Encontrar y eliminar la celda
-        var index = -1;
-        for (var i = this.celdasGrupales.length - 1; i >= 0; i--) {
-            if (this.celdasGrupales[i].x === celda.x && this.celdasGrupales[i].y === celda.y) {
-                index = i;
-                break;
-            }
-        }
-        
-        if (index === -1) return false;
-        
-        this.celdasGrupales.splice(index, 1);
-        this.estado.celdasColocadas = this.celdasGrupales;
-        
-        // Remover de contribuciones
-        if (this.contribuciones[jugadorId]) {
-            var contribs = this.contribuciones[jugadorId];
-            for (var j = contribs.length - 1; j >= 0; j--) {
-                if (contribs[j].x === celda.x && contribs[j].y === celda.y) {
-                    contribs.splice(j, 1);
-                    leaderboardManager.establecerPuntuacion(jugadorId, contribs.length);
-                    break;
-                }
-            }
-        }
-        
-        // Actualizar zoom
-        zoomManager.actualizarJugador(jugadorId, {
-            celdasColocadas: this.celdasGrupales
-        });
-        
-        this.notificar();
-        return true;
-    }
 }
 
-// Crear instancia singleton
 var juegoManager = new JuegoManager();
 
-// Exportar para usar en otros modulos
 export { JuegoManager, juegoManager };
