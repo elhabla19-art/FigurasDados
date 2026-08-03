@@ -24,6 +24,10 @@ let config = {
 // Referencias a botones
 let btnFiguraSimple, btnFiguraGrupal;
 
+// Flag para controlar sincronización y evitar bucles
+let sincronizando = false;
+let ultimoEstadoRecibido = null;
+
 // ===== CONFIGURACIÓN PRINCIPAL =====
 export function configurarJuego(opciones) {
     config.myId = opciones.getMyId();
@@ -49,7 +53,7 @@ function configurarObservers() {
         renderizarTablero(estado);
         actualizarUI(estado);
         actualizarBotonesFigura();
-        if (config.modoJuego === 'multi' && mqttManager.isConnected()) {
+        if (config.modoJuego === 'multi' && mqttManager.isConnected() && !sincronizando) {
             publicarCambioLocal(estado);
         }
     });
@@ -61,6 +65,9 @@ function configurarObservers() {
 
 // ===== PUBLICACIÓN DE ESTADO =====
 function publicarCambioLocal(estado) {
+    // No publicar si estamos en medio de una sincronización
+    if (sincronizando) return;
+    
     const jugador = leaderboardManager.obtenerJugador(config.myId);
     const payload = {
         nombre: config.myName,
@@ -74,16 +81,19 @@ function publicarCambioLocal(estado) {
         modoFigura: estado.modoFigura || 'simple'
     };
     
+    // SIEMPRE enviar datos grupales si estamos en modo grupal
     if (estado.modoFigura === 'grupal') {
         payload.celdasGrupales = juegoManager.obtenerCeldasGrupales();
         payload.contribuciones = juegoManager.obtenerContribuciones();
         payload.puntosPorCelda = juegoManager.obtenerPuntosPorCelda();
+        payload.figura = estado.figuraActual;
     }
     
     mqttManager.publicarEstado(payload);
 }
 
 function publicarEstadoCompleto() {
+    if (sincronizando) return;
     const estado = juegoManager.obtenerEstado();
     publicarCambioLocal(estado);
 }
@@ -164,7 +174,7 @@ function configurarEventos(opciones) {
                 generadaPor: config.myId,
                 nombreGenerador: config.myName
             });
-            setTimeout(publicarEstadoCompleto, 100);
+            setTimeout(publicarEstadoCompleto, 150);
         }
         
         actualizarUIYBotones();
@@ -189,7 +199,7 @@ function configurarEventos(opciones) {
                 generadaPor: config.myId,
                 nombreGenerador: config.myName
             });
-            setTimeout(publicarEstadoCompleto, 100);
+            setTimeout(publicarEstadoCompleto, 150);
         }
         
         actualizarUIYBotones();
@@ -210,7 +220,7 @@ function configurarEventos(opciones) {
         actualizarBotonesFigura();
         
         if (config.modoJuego === 'multi' && mqttManager.isConnected()) {
-            setTimeout(publicarEstadoCompleto, 100);
+            setTimeout(publicarEstadoCompleto, 150);
         }
         
         document.getElementById('confirmModal').style.display = 'none';
@@ -282,9 +292,12 @@ function unirseSala(codigo) {
     
     setTimeout(publicarEstadoCompleto, 100);
     
-    // Solicitar sincronización
+    // Solicitar sincronización completa de la sala
     setTimeout(() => {
-        mqttManager.publicar('estado', { accion: 'sync_request' });
+        mqttManager.publicar('estado', { 
+            accion: 'sync_request',
+            solicitante: config.myId
+        });
     }, 500);
     
     // Intervalo de publicación
@@ -293,7 +306,7 @@ function unirseSala(codigo) {
     }
     
     config.intervaloPublicacion = setInterval(() => {
-        if (config.modoJuego === 'multi' && mqttManager.isConnected()) {
+        if (config.modoJuego === 'multi' && mqttManager.isConnected() && !sincronizando) {
             publicarEstadoCompleto();
         }
     }, 3000);
@@ -326,98 +339,191 @@ function manejarEstadoCompleto(data) {
     const jugadorId = data.id;
     if (jugadorId === config.myId) return;
     
-    const nombre = data.nombre || 'Jugador';
-    
-    // Actualizar leaderboard
-    const jugadorExistente = leaderboardManager.obtenerJugador(jugadorId);
-    leaderboardManager.agregarJugador(jugadorId, 
-        nombre !== 'Jugador' ? nombre : jugadorExistente?.nombre || 'Jugador'
-    );
-    
-    if (data.puntos !== undefined) {
-        leaderboardManager.establecerPuntuacion(jugadorId, data.puntos);
-    }
-    if (data.puntosSimples !== undefined) {
-        leaderboardManager.establecerPuntosSimples(jugadorId, data.puntosSimples);
-    }
-    if (data.puntosGrupales !== undefined) {
-        leaderboardManager.establecerPuntosGrupales(jugadorId, data.puntosGrupales);
-    }
-    if (data.estado) {
-        leaderboardManager.actualizarEstado(jugadorId, data.estado);
-    }
-    
-    // Sincronización grupal
-    if (data.modoFigura === 'grupal' && data.celdasGrupales) {
-        const estadoLocal = juegoManager.obtenerEstado();
-        if (estadoLocal.modoFigura === 'grupal') {
-            juegoManager.sincronizarCeldasGrupales(
-                data.celdasGrupales,
-                data.contribuciones,
-                data.figura
-            );
-            
-            const nuevoEstado = juegoManager.obtenerEstado();
-            renderizarTablero(nuevoEstado);
-            actualizarUI(nuevoEstado);
-            actualizarBotonesFigura();
-        }
-    }
-    
-    // Actualizar zoom
-    zoomManager.actualizarJugador(jugadorId, {
-        nombre,
-        figura: data.figura || null,
-        celdasColocadas: data.celdas || [],
-        estado: data.estado || 'jugando'
+    // Evitar procesar el mismo estado dos veces
+    const estadoHash = JSON.stringify({
+        id: data.id,
+        celdas: data.celdas?.map(c => `${c.x},${c.y}`).sort().join('|'),
+        modoFigura: data.modoFigura,
+        completado: data.completado
     });
     
-    if (zoomManager.estaEnZoom(jugadorId)) {
-        const jugadorActualizado = zoomManager.obtenerJugador(jugadorId);
-        if (jugadorActualizado) {
-            actualizarZoomDirecto(jugadorActualizado);
-        }
-    }
+    if (ultimoEstadoRecibido === estadoHash) return;
+    ultimoEstadoRecibido = estadoHash;
     
-    // Responder a sync_request
-    if (data.accion === 'sync_request') {
-        setTimeout(publicarEstadoCompleto, 100);
+    // Activar flag de sincronización para evitar bucles
+    sincronizando = true;
+    
+    try {
+        const nombre = data.nombre || 'Jugador';
+        
+        // Actualizar leaderboard
+        const jugadorExistente = leaderboardManager.obtenerJugador(jugadorId);
+        leaderboardManager.agregarJugador(jugadorId, 
+            nombre !== 'Jugador' ? nombre : jugadorExistente?.nombre || 'Jugador'
+        );
+        
+        if (data.puntos !== undefined) {
+            leaderboardManager.establecerPuntuacion(jugadorId, data.puntos);
+        }
+        if (data.puntosSimples !== undefined) {
+            leaderboardManager.establecerPuntosSimples(jugadorId, data.puntosSimples);
+        }
+        if (data.puntosGrupales !== undefined) {
+            leaderboardManager.establecerPuntosGrupales(jugadorId, data.puntosGrupales);
+        }
+        if (data.estado) {
+            leaderboardManager.actualizarEstado(jugadorId, data.estado);
+        }
+        
+        // Sincronización grupal - SOLO si el emisor está en modo grupal
+        if (data.modoFigura === 'grupal' && data.figura) {
+            const estadoLocal = juegoManager.obtenerEstado();
+            
+            // Si el jugador local no está en modo grupal, inicializarlo
+            if (estadoLocal.modoFigura !== 'grupal') {
+                juegoManager.estado.modoFigura = 'grupal';
+                juegoManager.estado.figuraActual = clonarObjeto(data.figura);
+                juegoManager.estado.enJuego = true;
+                juegoManager.estado.completado = false;
+                juegoManager.celdasGrupales = [];
+                juegoManager.contribuciones = {};
+                juegoManager.puntosPorCelda = {};
+            }
+            
+            // Solo sincronizar si las celdas son diferentes (evitar bucles)
+            const celdasActuales = juegoManager.obtenerCeldasActuales();
+            const celdasRecibidas = data.celdasGrupales || [];
+            
+            if (JSON.stringify(celdasActuales) !== JSON.stringify(celdasRecibidas)) {
+                juegoManager.sincronizarCeldasGrupales(
+                    data.celdasGrupales || [],
+                    data.contribuciones || {},
+                    data.figura
+                );
+                
+                const nuevoEstado = juegoManager.obtenerEstado();
+                renderizarTablero(nuevoEstado);
+                actualizarUI(nuevoEstado);
+                actualizarBotonesFigura();
+            }
+        }
+        
+        // Actualizar zoom
+        zoomManager.actualizarJugador(jugadorId, {
+            nombre,
+            figura: data.figura || null,
+            celdasColocadas: data.celdas || [],
+            estado: data.estado || 'jugando'
+        });
+        
+        if (zoomManager.estaEnZoom(jugadorId)) {
+            const jugadorActualizado = zoomManager.obtenerJugador(jugadorId);
+            if (jugadorActualizado) {
+                actualizarZoomDirecto(jugadorActualizado);
+            }
+        }
+        
+        // Responder a sync_request
+        if (data.accion === 'sync_request') {
+            const estado = juegoManager.obtenerEstado();
+            if (estado.modoFigura === 'grupal' && estado.figuraActual) {
+                const payload = {
+                    nombre: config.myName,
+                    figura: estado.figuraActual,
+                    celdas: estado.celdasColocadas,
+                    estado: estado.completado ? 'completado' : 'jugando',
+                    puntos: leaderboardManager.obtenerJugador(config.myId)?.puntos || 0,
+                    puntosSimples: leaderboardManager.obtenerJugador(config.myId)?.puntosSimples || 0,
+                    puntosGrupales: leaderboardManager.obtenerJugador(config.myId)?.puntosGrupales || 0,
+                    figurasCompletadas: leaderboardManager.obtenerJugador(config.myId)?.figurasCompletadas || 0,
+                    modoFigura: 'grupal',
+                    celdasGrupales: juegoManager.obtenerCeldasGrupales(),
+                    contribuciones: juegoManager.obtenerContribuciones(),
+                    puntosPorCelda: juegoManager.obtenerPuntosPorCelda()
+                };
+                mqttManager.publicarEstado(payload);
+            } else {
+                setTimeout(publicarEstadoCompleto, 100);
+            }
+        }
+    } finally {
+        // Desactivar flag de sincronización después de procesar
+        setTimeout(() => {
+            sincronizando = false;
+        }, 200);
     }
 }
 
 function manejarFiguraGrupalRemota(data) {
     const { figura, modo, nombreGenerador } = data;
     
-    if (modo === 'grupal') {
-        juegoManager.iniciarModoGrupal(config.myId, figura);
-    } else {
-        juegoManager.iniciarModoSimple(config.myId, figura);
-    }
+    sincronizando = true;
     
-    const estado = juegoManager.obtenerEstado();
-    renderizarTablero(estado);
-    actualizarUI(estado);
-    actualizarBotonesFigura();
+    try {
+        // Si es grupal, NO reiniciar el estado, solo actualizar la figura
+        if (modo === 'grupal') {
+            const estado = juegoManager.obtenerEstado();
+            if (estado.modoFigura !== 'grupal' || !estado.figuraActual) {
+                // Solo si no hay figura grupal, iniciar el modo
+                juegoManager.iniciarModoGrupal(config.myId, figura);
+            } else {
+                // Si ya hay figura, solo actualizar
+                juegoManager.estado.figuraActual = clonarObjeto(figura);
+                juegoManager.estado.completado = false;
+                juegoManager.celdasGrupales = [];
+                juegoManager.estado.celdasColocadas = [];
+                juegoManager.contribuciones = {};
+                juegoManager.puntosPorCelda = {};
+                juegoManager.notificar();
+            }
+        } else {
+            // Modo simple
+            juegoManager.iniciarModoSimple(config.myId, figura);
+        }
+        
+        const estado = juegoManager.obtenerEstado();
+        renderizarTablero(estado);
+        actualizarUI(estado);
+        actualizarBotonesFigura();
+    } finally {
+        setTimeout(() => {
+            sincronizando = false;
+        }, 200);
+    }
 }
 
 function manejarCompletarRemoto(data) {
     const jugadorId = data.jugadorId || data.id;
     if (jugadorId === config.myId) return;
     
-    leaderboardManager.actualizarEstado(jugadorId, 'completado');
-    zoomManager.actualizarJugador(jugadorId, { estado: 'completado' });
+    sincronizando = true;
     
-    if (data.puntos !== undefined) {
-        leaderboardManager.establecerPuntuacion(jugadorId, data.puntos);
-    }
-    
-    const estadoLocal = juegoManager.obtenerEstado();
-    if (estadoLocal.figuraActual && !estadoLocal.completado) {
-        juegoManager.marcarCompletadoRemoto();
+    try {
+        leaderboardManager.actualizarEstado(jugadorId, 'completado');
+        zoomManager.actualizarJugador(jugadorId, { estado: 'completado' });
+        
+        if (data.puntos !== undefined) {
+            leaderboardManager.establecerPuntuacion(jugadorId, data.puntos);
+        }
+        
+        // Si estamos en modo grupal y el otro completó, verificar si ya estamos completos
+        const estadoLocal = juegoManager.obtenerEstado();
+        if (estadoLocal.modoFigura === 'grupal' && !estadoLocal.completado) {
+            const totalCeldas = estadoLocal.figuraActual?.celdas?.length || 0;
+            const celdasActuales = juegoManager.obtenerCeldasActuales();
+            if (celdasActuales.length === totalCeldas && totalCeldas > 0) {
+                juegoManager.completarFigura();
+            }
+        }
+        
         const nuevoEstado = juegoManager.obtenerEstado();
         renderizarTablero(nuevoEstado);
         actualizarUI(nuevoEstado);
         actualizarBotonesFigura();
+    } finally {
+        setTimeout(() => {
+            sincronizando = false;
+        }, 200);
     }
 }
 
@@ -432,7 +538,7 @@ export function handleCellClick(x, y, estaColocada) {
     // Si la celda ya está colocada, deshacer
     if (estaColocada) {
         if (juegoManager.deshacerCelda(x, y)) {
-            if (config.modoJuego === 'multi' && mqttManager.isConnected()) {
+            if (config.modoJuego === 'multi' && mqttManager.isConnected() && !sincronizando) {
                 setTimeout(publicarEstadoCompleto, 50);
             }
             actualizarBotonesFigura();
@@ -447,7 +553,7 @@ export function handleCellClick(x, y, estaColocada) {
     
     // Colocar dado
     if (juegoManager.colocarDado(x, y)) {
-        if (config.modoJuego === 'multi' && mqttManager.isConnected()) {
+        if (config.modoJuego === 'multi' && mqttManager.isConnected() && !sincronizando) {
             setTimeout(publicarEstadoCompleto, 50);
             
             const nuevoEstado = juegoManager.obtenerEstado();

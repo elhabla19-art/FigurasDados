@@ -24,23 +24,25 @@ class JuegoManager {
         this.puntajesAcumulados = {};
         this.puntajesGrupales = {};
         this.puntajesSimples = {};
+        this.ultimoEstadoHash = null; // Para evitar notificaciones duplicadas
     }
 
-    iniciarVacio(jugadorId) {
+    iniciarVacio(jugadorId, figuraInicial = null, modoFigura = 'simple') {
         this.estado = {
             jugadorId,
-            figuraActual: null,
+            figuraActual: figuraInicial || null,
             celdasColocadas: [],
             completado: false,
             ronda: 0,
             enJuego: true,
-            modoFigura: 'simple'
+            modoFigura: modoFigura
         };
         this.celdasGrupales = [];
         this.contribuciones = {};
         this.puntosPorCelda = {};
+        this.ultimoEstadoHash = null;
         deshacerManager.limpiarHistorialJugador(jugadorId);
-        leaderboardManager.actualizarFigura(jugadorId, null);
+        leaderboardManager.actualizarFigura(jugadorId, this.estado.figuraActual);
         leaderboardManager.actualizarCeldas(jugadorId, []);
         this.notificar();
         return null;
@@ -57,6 +59,7 @@ class JuegoManager {
         this.estado.completado = false;
         this.estado.ronda += 1;
         this.estado.enJuego = true;
+        this.ultimoEstadoHash = null;
         
         deshacerManager.limpiarHistorialJugador(jugadorId);
         leaderboardManager.actualizarFigura(jugadorId, this.estado.figuraActual);
@@ -92,6 +95,7 @@ class JuegoManager {
         this.estado.completado = false;
         this.estado.ronda += 1;
         this.estado.enJuego = true;
+        this.ultimoEstadoHash = null;
         
         deshacerManager.limpiarHistorialJugador(jugadorId);
         leaderboardManager.actualizarFigura(jugadorId, this.estado.figuraActual);
@@ -117,7 +121,21 @@ class JuegoManager {
     }
 
     sincronizarCeldasGrupales(celdas, contribuciones, figura) {
-        if (this.estado.modoFigura !== 'grupal') return;
+        // Si no estamos en modo grupal pero recibimos datos grupales, inicializar el modo grupal
+        if (this.estado.modoFigura !== 'grupal') {
+            if (figura) {
+                this.estado.modoFigura = 'grupal';
+                this.estado.figuraActual = clonarObjeto(figura);
+                this.estado.enJuego = true;
+                this.estado.completado = false;
+                this.celdasGrupales = [];
+                this.contribuciones = {};
+                this.puntosPorCelda = {};
+                this.ultimoEstadoHash = null;
+            } else {
+                return;
+            }
+        }
         
         if (figura) {
             this.estado.figuraActual = clonarObjeto(figura);
@@ -130,11 +148,12 @@ class JuegoManager {
             this.contribuciones = clonarObjeto(contribuciones);
         }
         
-        const totalCeldas = this.estado.figuraActual?.celdas.length || 0;
+        const totalCeldas = this.estado.figuraActual?.celdas?.length || 0;
         if (this.celdasGrupales.length === totalCeldas && totalCeldas > 0) {
             this.estado.completado = true;
         }
         
+        this.ultimoEstadoHash = null;
         this.notificar();
     }
 
@@ -181,12 +200,6 @@ class JuegoManager {
             modo: this.estado.modoFigura
         });
         
-        // Verificar completado
-        const totalCeldas = this.estado.figuraActual.celdas.length;
-        if (this.obtenerCeldasActuales().length === totalCeldas) {
-            this.completarFigura();
-        }
-        
         const celdasActualizadas = this.obtenerCeldasActuales();
         leaderboardManager.actualizarCeldas(this.estado.jugadorId, celdasActualizadas);
         zoomManager.actualizarJugador(this.estado.jugadorId, {
@@ -194,6 +207,14 @@ class JuegoManager {
             estado: this.estado.completado ? 'completado' : 'jugando'
         });
         
+        // Verificar completado DESPUÉS de actualizar las celdas
+        const totalCeldas = this.estado.figuraActual.celdas.length;
+        if (this.obtenerCeldasActuales().length === totalCeldas) {
+            this.completarFigura();
+        }
+        
+        // Notificar una sola vez al final
+        this.ultimoEstadoHash = null;
         this.notificar();
         return true;
     }
@@ -222,6 +243,7 @@ class JuegoManager {
         }
         
         zoomManager.actualizarJugador(this.estado.jugadorId, { estado: 'completado' });
+        this.ultimoEstadoHash = null;
         this.notificar();
         return true;
     }
@@ -231,6 +253,7 @@ class JuegoManager {
         
         this.estado.completado = true;
         zoomManager.actualizarJugador(this.estado.jugadorId, { estado: 'completado' });
+        this.ultimoEstadoHash = null;
         this.notificar();
         return true;
     }
@@ -249,16 +272,19 @@ class JuegoManager {
         const celdaRemovida = celdasActuales.pop();
         
         if (this.estado.modoFigura === 'grupal') {
+            // Buscar en qué contribución estaba esta celda
+            let encontrado = false;
             for (const jugadorId in this.contribuciones) {
                 const contribs = this.contribuciones[jugadorId];
                 const idx = contribs.findIndex(c => c.x === x && c.y === y);
                 if (idx !== -1) {
                     contribs.splice(idx, 1);
-                    this.puntosPorCelda[jugadorId] = (this.puntosPorCelda[jugadorId] || 1) - 1;
-                    this.puntajesGrupales[jugadorId] = (this.puntajesGrupales[jugadorId] || 0) - 1;
+                    this.puntosPorCelda[jugadorId] = Math.max(0, (this.puntosPorCelda[jugadorId] || 1) - 1);
+                    this.puntajesGrupales[jugadorId] = Math.max(0, (this.puntajesGrupales[jugadorId] || 0) - 1);
                     const total = (this.puntajesSimples[jugadorId] || 0) + (this.puntajesGrupales[jugadorId] || 0);
                     leaderboardManager.establecerPuntuacion(jugadorId, total);
                     leaderboardManager.establecerPuntosGrupales(jugadorId, this.puntajesGrupales[jugadorId] || 0);
+                    encontrado = true;
                     break;
                 }
             }
@@ -281,6 +307,7 @@ class JuegoManager {
             celdasColocadas: celdasActualizadas
         });
         
+        this.ultimoEstadoHash = null;
         this.notificar();
         return true;
     }
@@ -296,6 +323,7 @@ class JuegoManager {
         }
         
         this.estado.completado = false;
+        this.ultimoEstadoHash = null;
         deshacerManager.limpiarHistorialJugador(this.estado.jugadorId);
         leaderboardManager.actualizarCeldas(this.estado.jugadorId, []);
         zoomManager.actualizarJugador(this.estado.jugadorId, {
@@ -347,7 +375,19 @@ class JuegoManager {
 
     notificar() {
         const data = this.obtenerEstado();
-        this.observers.forEach(cb => cb(data));
+        // Crear hash para evitar notificaciones duplicadas
+        const hash = JSON.stringify({
+            figuraId: data.figuraActual?.id || null,
+            celdas: data.celdasColocadas.map(c => `${c.x},${c.y}`).sort().join('|'),
+            completado: data.completado,
+            modoFigura: data.modoFigura
+        });
+        
+        // Solo notificar si hay cambios reales
+        if (this.ultimoEstadoHash !== hash) {
+            this.ultimoEstadoHash = hash;
+            this.observers.forEach(cb => cb(data));
+        }
     }
 }
 

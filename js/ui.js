@@ -5,6 +5,7 @@ import { handleCellClick } from './config.js';
 
 let gameBoard, playersList, puntosTotal, figurasCompletadas;
 let clickHandlerAttached = false;
+let ultimoEstadoRenderizado = null;
 
 export function initUI() {
     gameBoard = document.getElementById('game-board');
@@ -70,8 +71,24 @@ export function renderizarTablero(estado) {
                 <p style="font-size: 0.9rem;">Presiona "Figura Simple" o "Figura Grupal" para comenzar</p>
             </div>
         `;
+        ultimoEstadoRenderizado = null;
         return;
     }
+    
+    // Crear un hash del estado actual para evitar renders innecesarios
+    const hash = JSON.stringify({
+        figuraId: figuraActual.id,
+        celdasColocadas: celdasColocadas.map(c => `${c.x},${c.y}`).sort().join('|'),
+        completado: completado,
+        modoFigura: estado.modoFigura,
+        totalCeldas: figuraActual.celdas.length
+    });
+    
+    // Si el estado no cambió, no renderizar
+    if (ultimoEstadoRenderizado === hash) {
+        return;
+    }
+    ultimoEstadoRenderizado = hash;
     
     const celdas = figuraActual.celdas;
     const xs = celdas.map(c => c.x);
@@ -81,41 +98,64 @@ export function renderizarTablero(estado) {
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
     const ancho = maxX - minX + 1;
+    const alto = maxY - minY + 1;
     
     const colocadasSet = new Set(celdasColocadas.map(c => `${c.x},${c.y}`));
     
-    let html = `<div class="dice-grid" style="grid-template-columns: repeat(${ancho}, 1fr);">`;
+    // Determinar el tamaño de celda basado en la cantidad de celdas
+    const totalCeldas = celdas.length;
+    let cellSize = '50px';
+    let fontSize = '1.4rem';
+    let valueFontSize = '1.6rem';
+    let gap = '8px';
+    
+    if (totalCeldas > 25) {
+        cellSize = '35px';
+        fontSize = '0.9rem';
+        valueFontSize = '1.1rem';
+        gap = '5px';
+    } else if (totalCeldas > 15) {
+        cellSize = '40px';
+        fontSize = '1rem';
+        valueFontSize = '1.3rem';
+        gap = '6px';
+    } else if (totalCeldas > 8) {
+        cellSize = '45px';
+        fontSize = '1.2rem';
+        valueFontSize = '1.4rem';
+        gap = '7px';
+    }
+    
+    let html = `<div class="dice-grid" style="grid-template-columns: repeat(${ancho}, 1fr); gap: ${gap}; padding: 8px;">`;
     
     for (let y = minY; y <= maxY; y++) {
         for (let x = minX; x <= maxX; x++) {
             const celda = celdas.find(c => c.x === x && c.y === y);
             
             if (!celda) {
-                html += `<div class="dice-cell vacio"></div>`;
+                html += `<div class="dice-cell vacio" style="width: ${cellSize}; height: ${cellSize};"></div>`;
                 continue;
             }
             
             const id = `${x},${y}`;
             const colocada = colocadasSet.has(id);
             
-            // Determinar clase:
-            // - completado: si la figura está completada
-            // - colocado: si la celda está marcada
-            // - normal: si no está marcada (sin borde especial)
             let clase = 'dice-cell';
             if (completado) {
                 clase += ' completado';
             } else if (colocada) {
                 clase += ' colocado';
             }
-            // Si no está colocada, solo 'dice-cell' (sin borde verde)
             
             html += `
                 <div class="${clase}" 
                      data-x="${x}" data-y="${y}" 
                      data-colocada="${colocada}" 
-                     data-esfigura="true">
-                    <span class="dice-value">${celda.valor}</span>
+                     data-esfigura="true"
+                     style="width: ${cellSize}; height: ${cellSize}; font-size: ${fontSize};">
+                    <span class="dice-value" style="font-size: ${valueFontSize};">
+                        ${celda.valor}
+                    </span>
                 </div>
             `;
         }
@@ -143,15 +183,23 @@ export function renderizarLeaderboard() {
     }
     
     let html = '';
-    for (const jugador of ranking) {
+    let miPosicion = -1;
+    
+    for (let i = 0; i < ranking.length; i++) {
+        const jugador = ranking[i];
         const esMi = jugador.id === myId;
+        if (esMi) miPosicion = i;
+        
         const estado = jugador.estado || 'jugando';
         const estadoText = estado === 'completado' ? '✅ Completado' : '🎯 Jugando';
         const estadoClass = estado === 'completado' ? 'completado' : '';
+        const posicion = i + 1;
+        const medalla = posicion === 1 ? '🥇' : posicion === 2 ? '🥈' : posicion === 3 ? '🥉' : `#${posicion}`;
         
         html += `
             <div class="player-card ${esMi ? 'me' : ''}" data-player-id="${jugador.id}">
                 <div class="player-info">
+                    <span class="posicion">${medalla}</span>
                     <span class="nombre">${jugador.nombre}${esMi ? ' (Tu)' : ''}</span>
                     <span class="estado ${estadoClass}">${estadoText}</span>
                 </div>
@@ -168,10 +216,13 @@ export function renderizarLeaderboard() {
     
     playersList.innerHTML = html;
     
+    // Agregar evento click a cada tarjeta para mostrar zoom
     playersList.querySelectorAll('.player-card').forEach(card => {
-        card.addEventListener('click', function() {
+        card.addEventListener('click', function(e) {
             const id = this.dataset.playerId;
             if (id && id !== window.__myId) {
+                // Evitar que el click se propague si estamos en el elemento de posicion
+                if (e.target.closest('.posicion')) return;
                 mostrarZoom(id);
             }
         });
