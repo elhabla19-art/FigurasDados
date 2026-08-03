@@ -81,11 +81,12 @@ function publicarCambioLocal(estado) {
         modoFigura: estado.modoFigura || 'simple'
     };
     
-    // SIEMPRE enviar datos grupales si estamos en modo grupal
+    // SIEMPRE enviar datos grupales si estamos en modo grupal.
+    // Se envía el registro de eventos (colocar/deshacer) con timestamp, no solo
+    // el estado actual, para que la fusión en el receptor sea "last-write-wins"
+    // y tanto colocaciones como borrados (deshacer/reinicio) se propaguen bien.
     if (estado.modoFigura === 'grupal') {
-        payload.celdasGrupales = juegoManager.obtenerCeldasGrupales();
-        payload.contribuciones = juegoManager.obtenerContribuciones();
-        payload.puntosPorCelda = juegoManager.obtenerPuntosPorCelda();
+        payload.registroCeldas = juegoManager.obtenerRegistroCeldas();
         payload.figura = estado.figuraActual;
     }
     
@@ -388,18 +389,14 @@ function manejarEstadoCompleto(data) {
                 juegoManager.celdasGrupales = [];
                 juegoManager.contribuciones = {};
                 juegoManager.puntosPorCelda = {};
+                juegoManager.registroCeldas = {};
             }
             
-            // Solo sincronizar si las celdas son diferentes (evitar bucles)
-            const celdasActuales = juegoManager.obtenerCeldasActuales();
-            const celdasRecibidas = data.celdasGrupales || [];
-            
-            if (JSON.stringify(celdasActuales) !== JSON.stringify(celdasRecibidas)) {
-                juegoManager.sincronizarCeldasGrupales(
-                    data.celdasGrupales || [],
-                    data.contribuciones || {},
-                    data.figura
-                );
+            // La fusión por timestamp (sincronizarCeldasGrupales) es idempotente:
+            // si no hay eventos nuevos no cambia nada, así que ya no hace falta
+            // comparar arrays "a mano" para evitar bucles.
+            if (data.registroCeldas) {
+                juegoManager.sincronizarCeldasGrupales(data.registroCeldas, data.figura);
                 
                 const nuevoEstado = juegoManager.obtenerEstado();
                 renderizarTablero(nuevoEstado);
@@ -437,9 +434,7 @@ function manejarEstadoCompleto(data) {
                     puntosGrupales: leaderboardManager.obtenerJugador(config.myId)?.puntosGrupales || 0,
                     figurasCompletadas: leaderboardManager.obtenerJugador(config.myId)?.figurasCompletadas || 0,
                     modoFigura: 'grupal',
-                    celdasGrupales: juegoManager.obtenerCeldasGrupales(),
-                    contribuciones: juegoManager.obtenerContribuciones(),
-                    puntosPorCelda: juegoManager.obtenerPuntosPorCelda()
+                    registroCeldas: juegoManager.obtenerRegistroCeldas()
                 };
                 mqttManager.publicarEstado(payload);
             } else {
@@ -474,6 +469,7 @@ function manejarFiguraGrupalRemota(data) {
                 juegoManager.estado.celdasColocadas = [];
                 juegoManager.contribuciones = {};
                 juegoManager.puntosPorCelda = {};
+                juegoManager.registroCeldas = {};
                 juegoManager.notificar();
             }
         } else {

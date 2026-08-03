@@ -21,6 +21,11 @@ class JuegoManager {
         this.celdasGrupales = [];
         this.contribuciones = {};
         this.puntosPorCelda = {};
+        // Registro de eventos por celda (clave "x,y") con timestamp.
+        // Es la fuente de verdad para fusionar el tablero grupal entre jugadores:
+        // permite que tanto colocar como deshacer se propaguen correctamente
+        // (last-write-wins por timestamp), en vez de una simple union que solo suma.
+        this.registroCeldas = {};
         this.puntajesAcumulados = {};
         this.puntajesGrupales = {};
         this.puntajesSimples = {};
@@ -40,6 +45,7 @@ class JuegoManager {
         this.celdasGrupales = [];
         this.contribuciones = {};
         this.puntosPorCelda = {};
+        this.registroCeldas = {};
         this.ultimoEstadoHash = null;
         deshacerManager.limpiarHistorialJugador(jugadorId);
         leaderboardManager.actualizarFigura(jugadorId, this.estado.figuraActual);
@@ -53,6 +59,7 @@ class JuegoManager {
         this.celdasGrupales = [];
         this.contribuciones = {};
         this.puntosPorCelda = {};
+        this.registroCeldas = {};
         this.estado.jugadorId = jugadorId;
         this.estado.figuraActual = figuraRecibida || generarFigura('simple');
         this.estado.celdasColocadas = [];
@@ -89,6 +96,7 @@ class JuegoManager {
         this.celdasGrupales = [];
         this.contribuciones = {};
         this.puntosPorCelda = {};
+        this.registroCeldas = {};
         this.estado.jugadorId = jugadorId;
         this.estado.figuraActual = figuraRecibida || generarFigura('grupal');
         this.estado.celdasColocadas = this.celdasGrupales;
@@ -120,7 +128,7 @@ class JuegoManager {
         return this.estado.figuraActual;
     }
 
-    sincronizarCeldasGrupales(celdas, contribuciones, figura) {
+    sincronizarCeldasGrupales(registroRemoto, figura) {
         // Si no estamos en modo grupal pero recibimos datos grupales, inicializar el modo grupal
         if (this.estado.modoFigura !== 'grupal') {
             if (figura) {
@@ -131,6 +139,7 @@ class JuegoManager {
                 this.celdasGrupales = [];
                 this.contribuciones = {};
                 this.puntosPorCelda = {};
+                this.registroCeldas = {};
                 this.ultimoEstadoHash = null;
             } else {
                 return;
@@ -141,17 +150,46 @@ class JuegoManager {
             this.estado.figuraActual = clonarObjeto(figura);
         }
         
-        this.celdasGrupales = clonarObjeto(celdas || []);
+        // FUSIÓN "last-write-wins" por timestamp, en vez de union o reemplazo.
+        // Cada celda (colocada o deshecha) es un evento con timestamp. Al fusionar,
+        // por cada clave "x,y" nos quedamos con el evento MAS RECIENTE, sea de
+        // colocación (activa:true) o de borrado (activa:false). Esto evita dos
+        // problemas anteriores:
+        //  - reemplazar el array entero perdía celdas por condiciones de carrera
+        //  - una union pura nunca podía "olvidar" una celda, así que un deshacer
+        //    nunca se propagaba y la celda terminaba reapareciendo sola
+        const remoto = clonarObjeto(registroRemoto || {});
+        for (const clave in remoto) {
+            const eventoRemoto = remoto[clave];
+            const eventoLocal = this.registroCeldas[clave];
+            if (!eventoLocal || eventoRemoto.timestamp > eventoLocal.timestamp) {
+                this.registroCeldas[clave] = eventoRemoto;
+            }
+        }
+        
+        // Reconstruir celdasGrupales / contribuciones / puntosPorCelda desde el
+        // registro fusionado, en orden cronológico, para que "última celda propia"
+        // (usado por deshacerCelda) siga siendo confiable tras la fusión.
+        const eventosActivos = Object.values(this.registroCeldas)
+            .filter(e => e.activa)
+            .sort((a, b) => a.timestamp - b.timestamp);
+        
+        this.celdasGrupales = [];
+        this.contribuciones = {};
+        this.puntosPorCelda = {};
+        for (const evento of eventosActivos) {
+            const celda = { x: evento.x, y: evento.y, valor: evento.valor };
+            this.celdasGrupales.push(celda);
+            if (!this.contribuciones[evento.jugadorId]) {
+                this.contribuciones[evento.jugadorId] = [];
+            }
+            this.contribuciones[evento.jugadorId].push(celda);
+            this.puntosPorCelda[evento.jugadorId] = (this.puntosPorCelda[evento.jugadorId] || 0) + 1;
+        }
         this.estado.celdasColocadas = this.celdasGrupales;
         
-        if (contribuciones) {
-            this.contribuciones = clonarObjeto(contribuciones);
-        }
-        
         const totalCeldas = this.estado.figuraActual?.celdas?.length || 0;
-        if (this.celdasGrupales.length === totalCeldas && totalCeldas > 0) {
-            this.estado.completado = true;
-        }
+        this.estado.completado = this.celdasGrupales.length === totalCeldas && totalCeldas > 0;
         
         this.ultimoEstadoHash = null;
         this.notificar();
@@ -175,6 +213,13 @@ class JuegoManager {
         
         // Colocar
         if (this.estado.modoFigura === 'grupal') {
+            this.registroCeldas[`${x},${y}`] = {
+                x, y, valor,
+                jugadorId: this.estado.jugadorId,
+                timestamp: Date.now(),
+                activa: true
+            };
+            
             this.celdasGrupales.push(nuevaCelda);
             this.estado.celdasColocadas = this.celdasGrupales;
             
@@ -266,28 +311,44 @@ class JuegoManager {
         
         if (index === -1) return false;
         
-        // Solo se puede deshacer la última celda colocada
-        if (index !== celdasActuales.length - 1) return false;
+        if (this.estado.modoFigura === 'grupal') {
+            // En grupal, el array compartido se reordena constantemente por la
+            // fusion con snapshots remotos, asi que "ser el ultimo del array" ya
+            // no es un indicador confiable. Validamos contra la ultima
+            // contribucion PROPIA del jugador actual en su lugar.
+            const misContribuciones = this.contribuciones[this.estado.jugadorId] || [];
+            const ultimaPropia = misContribuciones[misContribuciones.length - 1];
+            if (!ultimaPropia || ultimaPropia.x !== x || ultimaPropia.y !== y) {
+                return false;
+            }
+        } else {
+            // En modo simple, solo se puede deshacer la última celda colocada
+            if (index !== celdasActuales.length - 1) return false;
+        }
         
-        const celdaRemovida = celdasActuales.pop();
+        celdasActuales.splice(index, 1);
         
         if (this.estado.modoFigura === 'grupal') {
-            // Buscar en qué contribución estaba esta celda
-            let encontrado = false;
-            for (const jugadorId in this.contribuciones) {
-                const contribs = this.contribuciones[jugadorId];
-                const idx = contribs.findIndex(c => c.x === x && c.y === y);
-                if (idx !== -1) {
-                    contribs.splice(idx, 1);
-                    this.puntosPorCelda[jugadorId] = Math.max(0, (this.puntosPorCelda[jugadorId] || 1) - 1);
-                    this.puntajesGrupales[jugadorId] = Math.max(0, (this.puntajesGrupales[jugadorId] || 0) - 1);
-                    const total = (this.puntajesSimples[jugadorId] || 0) + (this.puntajesGrupales[jugadorId] || 0);
-                    leaderboardManager.establecerPuntuacion(jugadorId, total);
-                    leaderboardManager.establecerPuntosGrupales(jugadorId, this.puntajesGrupales[jugadorId] || 0);
-                    encontrado = true;
-                    break;
-                }
-            }
+            // Tombstone: registramos el borrado con un timestamp nuevo, mayor al
+            // de la colocación. Así, cuando este evento se publique y otros
+            // jugadores lo reciban, su fusión por timestamp preferirá este
+            // borrado sobre la colocación vieja y la celda desaparecerá también
+            // en sus tableros, en vez de reaparecer por union pura.
+            this.registroCeldas[`${x},${y}`] = {
+                x, y,
+                valor: this.obtenerValorCelda(x, y),
+                jugadorId: this.estado.jugadorId,
+                timestamp: Date.now(),
+                activa: false
+            };
+            
+            const contribs = this.contribuciones[this.estado.jugadorId];
+            contribs.pop();
+            this.puntosPorCelda[this.estado.jugadorId] = Math.max(0, (this.puntosPorCelda[this.estado.jugadorId] || 1) - 1);
+            this.puntajesGrupales[this.estado.jugadorId] = Math.max(0, (this.puntajesGrupales[this.estado.jugadorId] || 0) - 1);
+            const total = (this.puntajesSimples[this.estado.jugadorId] || 0) + (this.puntajesGrupales[this.estado.jugadorId] || 0);
+            leaderboardManager.establecerPuntuacion(this.estado.jugadorId, total);
+            leaderboardManager.establecerPuntosGrupales(this.estado.jugadorId, this.puntajesGrupales[this.estado.jugadorId] || 0);
             this.estado.celdasColocadas = this.celdasGrupales;
         }
         
@@ -314,6 +375,19 @@ class JuegoManager {
 
     reiniciarTablero() {
         if (this.estado.modoFigura === 'grupal') {
+            // Marcamos como tombstone (borrado) cada celda activa, en vez de solo
+            // vaciar el array local, para que el reinicio también se propague
+            // correctamente al fusionarse en los demás clientes.
+            const ahora = Date.now();
+            for (const clave in this.registroCeldas) {
+                if (this.registroCeldas[clave].activa) {
+                    this.registroCeldas[clave] = {
+                        ...this.registroCeldas[clave],
+                        timestamp: ahora,
+                        activa: false
+                    };
+                }
+            }
             this.celdasGrupales = [];
             this.estado.celdasColocadas = this.celdasGrupales;
             this.contribuciones = {};
@@ -362,6 +436,10 @@ class JuegoManager {
 
     obtenerCeldasGrupales() {
         return this.celdasGrupales.slice();
+    }
+
+    obtenerRegistroCeldas() {
+        return clonarObjeto(this.registroCeldas);
     }
 
     setModo(modo, salaId) {
