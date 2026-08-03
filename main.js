@@ -4,7 +4,7 @@ import { mqttManager } from './mqtt.js';
 
 // Variables globales
 let myId = null;
-let myName = 'Jugador';
+let myName = '';
 let modoJuego = 'solo';
 let salaActual = null;
 
@@ -12,6 +12,9 @@ let salaActual = null;
 document.addEventListener('DOMContentLoaded', function() {
     // Inicializar UI
     initUI();
+    
+    // Limpiar campo de nombre
+    document.getElementById('playerName').value = '';
     
     // Exponer mqttManager globalmente
     window.__mqttManager = mqttManager;

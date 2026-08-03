@@ -80,6 +80,12 @@ body {
 }
 .modal-btn:active { transform: scale(0.97); }
 
+.modal-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .btn-primary { background: var(--color-primary); color: white; }
 .btn-secondary { background: var(--color-success); color: white; }
 .btn-outline { background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); }
@@ -250,7 +256,7 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     color: var(--color-grupal);
 }
 
-/* Modo grupal - celdas colocadas por mí */
+/* Modo grupal - celdas colocadas por mi */
 .dice-cell.colocado-grupal-mio {
     background: rgba(30, 136, 229, 0.3);
     border-color: var(--color-primary);
@@ -320,7 +326,7 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     border: 1px solid var(--border-color);
 }
 
-/* Badge de contribución (modo grupal) */
+/* Badge de contribucion (modo grupal) */
 .dice-cell .contribucion-badge {
     position: absolute;
     top: -8px;
@@ -523,28 +529,6 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     .modal-box h2 { font-size: 1.4rem; }
 }
 
-/* Animaciones adicionales */
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateX(-50%) translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-    }
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-/* Estilo para notificaciones */
-.notificacion {
-    animation: slideDown 0.3s ease-out;
-}
-
 /* Scrollbar personalizada */
 ::-webkit-scrollbar {
     width: 6px;
@@ -562,4 +546,11 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
+}
+
+/* Botones deshabilitados */
+.modal-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none !important;
 }
