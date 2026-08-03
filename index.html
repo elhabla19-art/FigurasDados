@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FigurasDados</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+
+    <!-- LOBBY PRINCIPAL -->
+    <div id="lobbyModal" class="modal-overlay">
+        <div class="modal-box">
+            <h2>Figuras Dados</h2>
+            <p>Selecciona un modo de juego</p>
+            <div class="input-group">
+                <label>Tu Nombre:</label>
+                <input type="text" id="playerName" placeholder="Ej. Leo" maxlength="10">
+            </div>
+            <div class="modal-buttons">
+                <div class="row-btns">
+                    <button class="modal-btn btn-primary" id="btnCrearSala">Crear Sala</button>
+                    <button class="modal-btn btn-secondary" id="btnUnirse">Unirse</button>
+                </div>
+                <button class="modal-btn btn-outline" id="btnJugarSolo" style="margin-top: 10px;">Jugar Solo (Local)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- UNIRSE A SALA -->
+    <div id="joinModal" class="modal-overlay">
+        <div class="modal-box">
+            <h2>Unirse a Sala</h2>
+            <p>Pide el codigo al creador de la sala</p>
+            <div class="input-group">
+                <label>Codigo de la Sala (4 letras/numeros):</label>
+                <input type="text" id="roomCodeInput" placeholder="ABCD" maxlength="4" style="text-transform: uppercase;">
+            </div>
+            <div class="modal-buttons row-btns">
+                <button class="modal-btn btn-outline" id="btnVolver">Volver</button>
+                <button class="modal-btn btn-secondary" id="btnEntrar">Entrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CARGANDO -->
+    <div id="loadingModal" class="modal-overlay">
+        <div class="modal-box" style="background: transparent; border: none; box-shadow: none;">
+            <h2 id="loadingText">Conectando...</h2>
+        </div>
+    </div>
+
+    <!-- REINICIAR -->
+    <div id="confirmModal" class="modal-overlay">
+        <div class="modal-box">
+            <h3>Reiniciar tablero</h3>
+            <p>Se borraran tus marcas actuales.</p>
+            <div class="modal-buttons row-btns">
+                <button class="modal-btn btn-outline" id="btnCancelar">Cancelar</button>
+                <button class="modal-btn btn-danger" id="btnConfirmarReset">Reiniciar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- UI DEL JUEGO -->
+    <header>
+        <h1>Figuras Dados</h1>
+        <div id="roomInfoDisplay" class="room-info" style="display: none;"></div>
+    </header>
+
+    <div class="app-container">
+        <div class="board-container">
+            <div class="board-header">
+                <span class="figura-label">Figura Objetivo</span>
+                <div class="board-controls">
+                    <button id="btnDeshacer" class="ctrl-btn">Deshacer</button>
+                    <button id="btnCompletar" class="ctrl-btn btn-completar">Completar</button>
+                </div>
+            </div>
+            <div class="board" id="game-board"></div>
+            <div class="board-footer">
+                <span id="progresoFigura">Progreso: 0/0</span>
+                <span id="estadoFigura">Coloca el dado inicial</span>
+            </div>
+        </div>
+
+        <div class="side-panel">
+            <div class="scoreboard">
+                <div class="puntuacion-section">
+                    <div class="puntos-total">
+                        PUNTOS: <span id="puntos-total">0</span>
+                    </div>
+                    <div class="figuras-completadas">
+                        Figuras: <span id="figuras-completadas">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de posiciones con mini tableros -->
+            <div class="leaderboard" id="leaderboardPanel">
+                <h3>Posiciones y Tableros</h3>
+                <div id="playersList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
