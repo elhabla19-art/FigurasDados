@@ -61,11 +61,14 @@ function ocultarConfirm() {
     confirmModal.style.display = 'none';
 }
 
-// Renderizar tablero
+// Renderizar tablero - MODIFICADO PARA MODO GRUPAL
 function renderizarTablero(estado) {
     var figuraActual = estado.figuraActual;
     var celdasColocadas = estado.celdasColocadas;
     var completado = estado.completado;
+    var modoFigura = estado.modoFigura || 'simple';
+    var myId = window.__myId || null;
+    var contribuciones = juegoManager.obtenerContribuciones() || {};
     
     if (!figuraActual) {
         gameBoard.innerHTML = '<p>Esperando figura...</p>';
@@ -81,6 +84,26 @@ function renderizarTablero(estado) {
     var maxY = Math.max.apply(null, ys);
     var ancho = maxX - minX + 1;
     
+    // Construir mapa de celdas colocadas por jugador (para modo grupal)
+    var celdasPorJugador = {};
+    if (modoFigura === 'grupal') {
+        for (var jugadorId in contribuciones) {
+            celdasPorJugador[jugadorId] = {};
+            var celdasJugador = contribuciones[jugadorId] || [];
+            for (var i = 0; i < celdasJugador.length; i++) {
+                var key = celdasJugador[i].x + ',' + celdasJugador[i].y;
+                celdasPorJugador[jugadorId][key] = true;
+            }
+        }
+    }
+    
+    // Construir mapa rápido de celdas colocadas
+    var celdasColocadasMap = {};
+    for (var i = 0; i < celdasColocadas.length; i++) {
+        var key = celdasColocadas[i].x + ',' + celdasColocadas[i].y;
+        celdasColocadasMap[key] = true;
+    }
+    
     var html = '<div class="dice-grid" style="grid-template-columns: repeat(' + ancho + ', 1fr);">';
     
     for (var y = minY; y <= maxY; y++) {
@@ -93,12 +116,30 @@ function renderizarTablero(estado) {
                 }
             }
             
-            var colocada = false;
-            for (var j = 0; j < celdasColocadas.length; j++) {
-                if (celdasColocadas[j].x === x && celdasColocadas[j].y === y) {
-                    colocada = true;
-                    break;
+            var estaColocada = false;
+            var colocadaPorMi = false;
+            var colocadaPorOtro = false;
+            var jugadorQueColoco = null;
+            
+            // Verificar si está colocada y por quién (modo grupal)
+            if (modoFigura === 'grupal') {
+                for (var jugadorId in celdasPorJugador) {
+                    var key = x + ',' + y;
+                    if (celdasPorJugador[jugadorId][key]) {
+                        estaColocada = true;
+                        jugadorQueColoco = jugadorId;
+                        if (jugadorId === myId) {
+                            colocadaPorMi = true;
+                        } else {
+                            colocadaPorOtro = true;
+                        }
+                        break;
+                    }
                 }
+            } else {
+                // Modo simple - usar celdasColocadas directamente
+                var key = x + ',' + y;
+                estaColocada = celdasColocadasMap[key] || false;
             }
             
             var esInicio = figuraActual.inicio.x === x && figuraActual.inicio.y === y;
@@ -109,8 +150,16 @@ function renderizarTablero(estado) {
                 clases += ' vacio';
             } else if (completado) {
                 clases += ' completado';
-            } else if (colocada) {
-                clases += ' colocado';
+            } else if (estaColocada) {
+                if (modoFigura === 'grupal') {
+                    if (colocadaPorMi) {
+                        clases += ' colocado-grupal-mio';
+                    } else if (colocadaPorOtro) {
+                        clases += ' colocado-grupal';
+                    }
+                } else {
+                    clases += ' colocado';
+                }
             } else if (disponible) {
                 clases += ' disponible';
             }
@@ -121,7 +170,7 @@ function renderizarTablero(estado) {
             
             var valor = celda ? celda.valor : '';
             var orden = 0;
-            if (celda) {
+            if (celda && estaColocada) {
                 for (var k = 0; k < celdasColocadas.length; k++) {
                     if (celdasColocadas[k].x === x && celdasColocadas[k].y === y) {
                         orden = k + 1;
@@ -131,14 +180,21 @@ function renderizarTablero(estado) {
             }
             
             html += '<div class="' + clases + '" data-x="' + x + '" data-y="' + y + 
-                    '" data-colocada="' + colocada + '">';
+                    '" data-colocada="' + estaColocada + '" data-colocada-por="' + (jugadorQueColoco || '') + '">';
             if (celda) {
                 html += '<span class="dice-value">' + valor + '</span>';
-                if (colocada && orden > 0) {
+                if (estaColocada && orden > 0 && modoFigura !== 'grupal') {
                     html += '<span class="dice-orden">' + orden + '</span>';
                 }
                 if (esInicio) {
                     html += '<span class="dice-indice">I</span>';
+                }
+                // Mostrar badge de quién colocó en modo grupal
+                if (modoFigura === 'grupal' && estaColocada && jugadorQueColoco) {
+                    var nombreJugador = leaderboardManager.obtenerJugador(jugadorQueColoco);
+                    var inicial = nombreJugador ? nombreJugador.nombre.charAt(0).toUpperCase() : '?';
+                    var badgeClass = colocadaPorMi ? '' : 'grupal';
+                    html += '<span class="contribucion-badge ' + badgeClass + '" title="' + (nombreJugador ? nombreJugador.nombre : 'Desconocido') + '">' + inicial + '</span>';
                 }
             }
             html += '</div>';
@@ -173,11 +229,27 @@ function actualizarUI(estado) {
         puntosTotal.textContent = jugador.puntos;
         figurasCompletadas.textContent = jugador.figurasCompletadas;
     }
+    
+    // Mostrar modo de juego
+    var modoFigura = estado.modoFigura || 'simple';
+    var puntuacionSection = document.querySelector('.puntuacion-section');
+    if (puntuacionSection) {
+        var puntosElement = document.getElementById('puntos-total');
+        if (puntosElement) {
+            if (modoFigura === 'grupal') {
+                puntosElement.className = 'puntos-total modo-grupal';
+            } else {
+                puntosElement.className = 'puntos-total';
+            }
+        }
+    }
 }
 
 function renderizarLeaderboard() {
     var ranking = leaderboardManager.obtenerRanking();
     var myId = window.__myId || null;
+    var esModoGrupal = juegoManager.modoFigura === 'grupal';
+    var contribuciones = juegoManager.obtenerContribuciones() || {};
     
     if (ranking.length === 0) {
         playersList.innerHTML = '<p style="text-align:center;color:var(--text-muted);">Esperando jugadores...</p>';
@@ -189,14 +261,22 @@ function renderizarLeaderboard() {
         var jugador = ranking[i];
         var esMi = jugador.id === myId;
         var estado = jugador.estado || 'jugando';
-        var estadoText = estado === 'completado' ? 'Completado' : 'Jugando';
+        var estadoText = estado === 'completado' ? '✓ Completado' : '● Jugando';
         var estadoClass = estado === 'completado' ? 'completado' : '';
+        
+        // En modo grupal, mostrar contribuciones
+        var contribs = contribuciones[jugador.id] || [];
+        var contribText = '';
+        if (esModoGrupal) {
+            contribText = ' <span class="contribuciones">(' + contribs.length + ' celdas)</span>';
+        }
         
         html += '<div class="player-card ' + (esMi ? 'me' : '') + '" data-player-id="' + jugador.id + '">';
         html += '    <span class="nombre">' + jugador.nombre + (esMi ? ' (Tu)' : '') + '</span>';
         html += '    <span>';
         html += '        <span class="estado ' + estadoClass + '">' + estadoText + '</span>';
-        html += '        <span class="puntos">' + jugador.puntos + '</span>';
+        html += '        <span class="puntos' + (esModoGrupal ? ' grupal' : '') + '">' + jugador.puntos + '</span>';
+        html += contribText;
         html += '    </span>';
         html += '</div>';
     }
