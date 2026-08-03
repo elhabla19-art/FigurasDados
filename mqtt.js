@@ -134,9 +134,14 @@ class MQTTManager {
 
     // Publicar estado del jugador
     publicarEstado(datos) {
-        return this.publicar('estado', datos);
+        var payload = {
+            ...datos,
+            id: this.myId,
+            timestamp: Date.now()
+        };
+        return this.publicar('estado', payload);
     }
-
+    
     // Publicar figura actual
     publicarFigura(figura) {
         return this.publicar('figura', { figura });

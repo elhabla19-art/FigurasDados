@@ -10,6 +10,7 @@ let myId = null;
 let myName = 'Jugador';
 let modoJuego = 'solo';
 let salaActual = null;
+let intervaloPublicacion = null;
 
 // DOM elements
 const lobbyModal = document.getElementById('lobbyModal');
@@ -82,9 +83,16 @@ function configurarEventos() {
 
     document.getElementById('btnConfirmarReset').addEventListener('click', function() {
         juegoManager.reiniciarTablero();
-        if (modoJuego === 'multi') {
+        if (modoJuego === 'multi' && mqttManager.isConnected()) {
+            var estado = juegoManager.obtenerEstado();
+            var jugador = leaderboardManager.obtenerJugador(myId);
             mqttManager.publicarEstado({
-                accion: 'reset'
+                nombre: myName,
+                figura: estado.figuraActual,
+                celdas: estado.celdasColocadas,
+                estado: estado.completado ? 'completado' : 'jugando',
+                puntos: jugador ? jugador.puntos : 0,
+                figurasCompletadas: jugador ? jugador.figurasCompletadas : 0
             });
         }
         ocultarConfirm();
@@ -107,30 +115,43 @@ function configurarEventos() {
 
 // Configurar observers
 function configurarObservers() {
-    // Verificar que los managers existan antes de suscribir
     if (juegoManager && typeof juegoManager.suscribir === 'function') {
         juegoManager.suscribir(function(estado) {
             renderizarTablero(estado);
             actualizarUI(estado);
+            // Publicar estado completo cuando cambia
+            if (modoJuego === 'multi' && mqttManager.isConnected()) {
+                var jugador = leaderboardManager.obtenerJugador(myId);
+                mqttManager.publicarEstado({
+                    nombre: myName,
+                    figura: estado.figuraActual,
+                    celdas: estado.celdasColocadas,
+                    estado: estado.completado ? 'completado' : 'jugando',
+                    puntos: jugador ? jugador.puntos : 0,
+                    figurasCompletadas: jugador ? jugador.figurasCompletadas : 0
+                });
+            }
         });
-    } else {
-        console.error('juegoManager no disponible');
     }
     
     if (leaderboardManager && typeof leaderboardManager.suscribir === 'function') {
         leaderboardManager.suscribir(function() {
             renderizarLeaderboard();
         });
-    } else {
-        console.error('leaderboardManager no disponible');
     }
     
     if (mqttManager && typeof mqttManager.suscribir === 'function') {
         mqttManager.suscribir(function(mensaje) {
             manejarMensajeMQTT(mensaje);
         });
-    } else {
-        console.error('mqttManager no disponible');
+    }
+    
+    // Registrar callback para actualizar zoom en tiempo real
+    if (zoomManager && typeof zoomManager.registrarZoomCallback === 'function') {
+        zoomManager.registrarZoomCallback(function(jugador) {
+            console.log('Callback de zoom llamado para:', jugador.nombre);
+            actualizarZoomDirecto(jugador);
+        });
     }
 }
 
@@ -167,12 +188,36 @@ function ocultarConfirm() {
 }
 
 function mostrarZoom(jugadorId) {
+    console.log('Mostrando zoom para:', jugadorId);
+    
+    // Obtener el jugador del zoomManager
     var jugador = zoomManager.obtenerJugador(jugadorId);
     if (!jugador) {
-        console.error('Jugador no encontrado:', jugadorId);
+        console.error('Jugador no encontrado en zoomManager:', jugadorId);
+        // Intentar obtener del leaderboard como fallback
+        var jugadorLB = leaderboardManager.obtenerJugador(jugadorId);
+        if (jugadorLB) {
+            console.log('Jugador encontrado en leaderboard, creando en zoomManager');
+            zoomManager.actualizarJugador(jugadorId, {
+                nombre: jugadorLB.nombre,
+                figura: jugadorLB.figuraActual,
+                celdasColocadas: jugadorLB.celdasColocadas,
+                estado: jugadorLB.estado || 'jugando'
+            });
+            jugador = zoomManager.obtenerJugador(jugadorId);
+        }
+    }
+    
+    if (!jugador) {
+        console.error('No se pudo obtener el jugador:', jugadorId);
+        zoomJugadorNombre.textContent = 'Jugador no encontrado';
+        zoomBoard.innerHTML = '<p>No hay datos disponibles</p>';
+        zoomInfo.innerHTML = '';
+        zoomModal.style.display = 'flex';
         return;
     }
     
+    // Actualizar la interfaz del zoom
     zoomJugadorNombre.textContent = jugador.nombre;
     zoomBoard.innerHTML = renderizarZoomTablero(jugador);
     
@@ -191,11 +236,43 @@ function cerrarZoom() {
     zoomModal.style.display = 'none';
 }
 
+function actualizarZoomDirecto(jugador) {
+    if (!jugador || zoomModal.style.display !== 'flex') {
+        console.log('Zoom no está abierto o no hay jugador');
+        return;
+    }
+    
+    // Verificar que el jugador mostrado sea el mismo
+    var nombreActual = zoomJugadorNombre.textContent;
+    if (nombreActual !== jugador.nombre) {
+        console.log('El jugador en zoom no coincide:', nombreActual, 'vs', jugador.nombre);
+        return;
+    }
+    
+    console.log('Actualizando zoom directo para:', jugador.nombre);
+    
+    zoomJugadorNombre.textContent = jugador.nombre;
+    zoomBoard.innerHTML = renderizarZoomTablero(jugador);
+    
+    var progreso = jugador.progreso || 0;
+    var estado = jugador.estado || 'jugando';
+    var total = jugador.figura ? jugador.figura.celdas.length : 0;
+    var colocadas = jugador.celdasColocadas ? jugador.celdasColocadas.length : 0;
+    
+    zoomInfo.innerHTML = 'Progreso: ' + colocadas + '/' + total + ' (' + progreso + '%) - ' + 
+                         (estado === 'completado' ? 'Completado!' : 'Jugando');
+}
+
 function renderizarZoomTablero(jugador) {
+    console.log('Renderizando zoom para:', jugador.nombre);
+    console.log('Figura:', jugador.figura);
+    console.log('Celdas colocadas:', jugador.celdasColocadas);
+    
     var figura = jugador.figura;
     var celdasColocadas = jugador.celdasColocadas || [];
     
-    if (!figura) {
+    if (!figura || !figura.celdas) {
+        console.warn('Figura no disponible para:', jugador.nombre);
         return '<p>Esperando figura...</p>';
     }
     
@@ -228,7 +305,7 @@ function renderizarZoomTablero(jugador) {
                 }
             }
             
-            var esInicio = figura.inicio.x === x && figura.inicio.y === y;
+            var esInicio = figura.inicio && figura.inicio.x === x && figura.inicio.y === y;
             var completado = jugador.estado === 'completado';
             
             var clases = 'dice-cell';
@@ -285,12 +362,55 @@ function unirseSala(codigo) {
     
     document.getElementById('leaderboardPanel').style.display = 'flex';
     
+    // Agregar el jugador al leaderboard con su nombre
+    leaderboardManager.agregarJugador(myId, myName);
+    
+    // Iniciar el juego
     iniciarJuegoMulti();
     
+    // Obtener estado inicial
+    var estado = juegoManager.obtenerEstado();
+    var jugador = leaderboardManager.obtenerJugador(myId);
+    
+    // Publicar estado completo con el nombre correcto
     mqttManager.publicarEstado({
         nombre: myName,
+        figura: estado.figuraActual,
+        celdas: estado.celdasColocadas,
+        estado: estado.completado ? 'completado' : 'jugando',
+        puntos: jugador ? jugador.puntos : 0,
+        figurasCompletadas: jugador ? jugador.figurasCompletadas : 0,
         accion: 'join'
     });
+    
+    // Solicitar sincronización de todos los jugadores
+    setTimeout(function() {
+        mqttManager.publicar('estado', { 
+            accion: 'sync_request' 
+        });
+    }, 500);
+    
+    // Limpiar intervalo anterior si existe
+    if (intervaloPublicacion) {
+        clearInterval(intervaloPublicacion);
+        intervaloPublicacion = null;
+    }
+    
+    // Publicar estado cada 3 segundos para mantener sincronización
+    intervaloPublicacion = setInterval(function() {
+        if (modoJuego === 'multi' && mqttManager.isConnected()) {
+            var estadoActual = juegoManager.obtenerEstado();
+            var jugadorActual = leaderboardManager.obtenerJugador(myId);
+            mqttManager.publicarEstado({
+                nombre: myName,
+                figura: estadoActual.figuraActual,
+                celdas: estadoActual.celdasColocadas,
+                estado: estadoActual.completado ? 'completado' : 'jugando',
+                puntos: jugadorActual ? jugadorActual.puntos : 0,
+                figurasCompletadas: jugadorActual ? jugadorActual.figurasCompletadas : 0
+            });
+        }
+    }, 3000);
 }
 
 // Iniciar juego solo
@@ -307,13 +427,8 @@ function iniciarJuegoSolo() {
 
 // Iniciar juego multijugador
 function iniciarJuegoMulti() {
-    leaderboardManager.agregarJugador(myId, myName);
-    
     juegoManager.setModo('multi', salaActual);
     juegoManager.iniciarRonda(myId);
-    
-    var estado = juegoManager.obtenerEstado();
-    mqttManager.publicarFigura(estado.figuraActual);
 }
 
 // Manejar mensajes MQTT
@@ -321,9 +436,12 @@ function manejarMensajeMQTT(mensaje) {
     var tipo = mensaje.tipo;
     var data = mensaje.data;
     
+    // Ignorar mensajes propios
+    if (data.id === myId) return;
+    
     switch(tipo) {
         case 'estado':
-            manejarEstadoJugador(data);
+            manejarEstadoCompleto(data);
             break;
         case 'figura':
             manejarFiguraRemota(data);
@@ -346,19 +464,53 @@ function manejarMensajeMQTT(mensaje) {
     }
 }
 
-function manejarEstadoJugador(data) {
+// Manejar estado completo de un jugador
+function manejarEstadoCompleto(data) {
     var jugadorId = data.id;
     if (jugadorId === myId) return;
     
-    if (data.nombre) {
-        leaderboardManager.agregarJugador(jugadorId, data.nombre);
+    var nombre = data.nombre || 'Jugador';
+    
+    console.log('Recibiendo estado completo de:', nombre);
+    console.log('Datos:', data);
+    
+    // Actualizar leaderboard
+    leaderboardManager.agregarJugador(jugadorId, nombre);
+    if (data.puntos !== undefined) {
+        leaderboardManager.establecerPuntuacion(jugadorId, data.puntos);
+    }
+    if (data.estado) {
+        leaderboardManager.actualizarEstado(jugadorId, data.estado);
     }
     
-    if (data.figura || data.celdas) {
-        zoomManager.actualizarJugador(jugadorId, {
-            figura: data.figura,
-            celdasColocadas: data.celdas || [],
-            estado: data.estado || 'jugando'
+    // Actualizar zoom con todos los datos
+    zoomManager.actualizarJugador(jugadorId, {
+        nombre: nombre,
+        figura: data.figura || null,
+        celdasColocadas: data.celdas || [],
+        estado: data.estado || 'jugando'
+    });
+    
+    // Verificar si el zoom está abierto y es para este jugador
+    if (zoomModal.style.display === 'flex') {
+        var jugadorZoom = zoomManager.obtenerJugador(jugadorId);
+        if (jugadorZoom && zoomJugadorNombre.textContent === jugadorZoom.nombre) {
+            console.log('Actualizando zoom desde estado completo');
+            actualizarZoomDirecto(jugadorZoom);
+        }
+    }
+    
+    // Si es una solicitud de sincronización, enviar nuestro estado
+    if (data.accion === 'sync_request') {
+        var estado = juegoManager.obtenerEstado();
+        var jugador = leaderboardManager.obtenerJugador(myId);
+        mqttManager.publicarEstado({
+            nombre: myName,
+            figura: estado.figuraActual,
+            celdas: estado.celdasColocadas,
+            estado: estado.completado ? 'completado' : 'jugando',
+            puntos: jugador ? jugador.puntos : 0,
+            figurasCompletadas: jugador ? jugador.figurasCompletadas : 0
         });
     }
 }
@@ -376,17 +528,29 @@ function manejarAccionRemota(data) {
         var jugador = zoomManager.obtenerJugador(data.jugadorId);
         if (jugador) {
             var celdas = (jugador.celdasColocadas || []).slice();
-            celdas.push(data.celda);
-            zoomManager.actualizarJugador(data.jugadorId, {
-                celdasColocadas: celdas
+            // Verificar si la celda ya está colocada
+            var yaColocada = celdas.some(function(c) {
+                return c.x === data.celda.x && c.y === data.celda.y;
             });
+            if (!yaColocada) {
+                celdas.push(data.celda);
+                zoomManager.actualizarJugador(data.jugadorId, {
+                    celdasColocadas: celdas
+                });
+            }
         }
     }
     if (data.tipo === 'deshacer' && data.jugadorId) {
         var jugador = zoomManager.obtenerJugador(data.jugadorId);
         if (jugador && jugador.celdasColocadas.length > 0) {
             var celdas = jugador.celdasColocadas.slice();
-            celdas.pop();
+            // Remover la última celda que coincida con la posición
+            for (var i = celdas.length - 1; i >= 0; i--) {
+                if (celdas[i].x === data.celda.x && celdas[i].y === data.celda.y) {
+                    celdas.splice(i, 1);
+                    break;
+                }
+            }
             zoomManager.actualizarJugador(data.jugadorId, {
                 celdasColocadas: celdas
             });
@@ -396,18 +560,35 @@ function manejarAccionRemota(data) {
 
 function manejarCompletarRemoto(data) {
     if (data.id === myId) return;
-    zoomManager.actualizarJugador(data.jugadorId, {
+    var jugadorId = data.jugadorId || data.id;
+    
+    leaderboardManager.actualizarEstado(jugadorId, 'completado');
+    zoomManager.actualizarJugador(jugadorId, {
         estado: 'completado'
     });
+    
+    if (data.puntos !== undefined) {
+        leaderboardManager.establecerPuntuacion(jugadorId, data.puntos);
+    }
 }
 
 function manejarDeshacerRemoto(data) {
     if (data.id === myId) return;
-    var jugador = zoomManager.obtenerJugador(data.jugadorId);
+    var jugadorId = data.jugadorId || data.id;
+    var jugador = zoomManager.obtenerJugador(jugadorId);
     if (jugador && jugador.celdasColocadas.length > 0) {
         var celdas = jugador.celdasColocadas.slice();
-        celdas.pop();
-        zoomManager.actualizarJugador(data.jugadorId, {
+        if (data.celda) {
+            for (var i = celdas.length - 1; i >= 0; i--) {
+                if (celdas[i].x === data.celda.x && celdas[i].y === data.celda.y) {
+                    celdas.splice(i, 1);
+                    break;
+                }
+            }
+        } else {
+            celdas.pop();
+        }
+        zoomManager.actualizarJugador(jugadorId, {
             celdasColocadas: celdas
         });
     }
@@ -415,7 +596,10 @@ function manejarDeshacerRemoto(data) {
 
 function manejarPuntuacionRemota(data) {
     if (data.id === myId) return;
-    leaderboardManager.actualizarPuntuacion(data.jugadorId, data.puntos || 0);
+    var jugadorId = data.jugadorId || data.id;
+    if (data.puntos !== undefined) {
+        leaderboardManager.establecerPuntuacion(jugadorId, data.puntos);
+    }
 }
 
 function manejarListaJugadores(data) {
@@ -423,7 +607,7 @@ function manejarListaJugadores(data) {
         for (var i = 0; i < data.jugadores.length; i++) {
             var jugador = data.jugadores[i];
             if (jugador.id !== myId) {
-                leaderboardManager.agregarJugador(jugador.id, jugador.nombre);
+                leaderboardManager.agregarJugador(jugador.id, jugador.nombre || 'Jugador');
             }
         }
     }
@@ -501,12 +685,9 @@ function renderizarTablero(estado) {
             var dataX = x;
             var dataY = y;
             var estaColocada = colocada;
-            var estaDisponible = disponible;
-            var estaCompletado = completado;
             
             html += '<div class="' + clases + '" data-x="' + dataX + '" data-y="' + dataY + 
-                    '" data-colocada="' + estaColocada + '" data-disponible="' + estaDisponible + 
-                    '" data-completado="' + estaCompletado + '">';
+                    '" data-colocada="' + estaColocada + '">';
             if (celda) {
                 html += '<span class="dice-value">' + valor + '</span>';
                 if (colocada && orden > 0) {
@@ -528,9 +709,10 @@ function renderizarTablero(estado) {
     for (var m = 0; m < celdasElementos.length; m++) {
         var el = celdasElementos[m];
         var colocada = el.dataset.colocada === 'true';
-        var completado = el.dataset.completado === 'true';
+        var completado2 = el.classList.contains('completado');
+        var vacio = el.classList.contains('vacio');
         
-        if (!completado) {
+        if (!completado2 && !vacio) {
             el.addEventListener('click', function() {
                 var x = parseInt(this.dataset.x);
                 var y = parseInt(this.dataset.y);
@@ -553,6 +735,17 @@ function handleCellClick(x, y, estaColocada) {
                 jugadorId: myId,
                 celda: { x: x, y: y }
             });
+            // Publicar estado completo después de deshacer
+            var nuevoEstado = juegoManager.obtenerEstado();
+            var jugador = leaderboardManager.obtenerJugador(myId);
+            mqttManager.publicarEstado({
+                nombre: myName,
+                figura: nuevoEstado.figuraActual,
+                celdas: nuevoEstado.celdasColocadas,
+                estado: nuevoEstado.completado ? 'completado' : 'jugando',
+                puntos: jugador ? jugador.puntos : 0,
+                figurasCompletadas: jugador ? jugador.figurasCompletadas : 0
+            });
         }
         return;
     }
@@ -563,6 +756,23 @@ function handleCellClick(x, y, estaColocada) {
             jugadorId: myId,
             celda: { x: x, y: y }
         });
+        // Publicar estado completo después de colocar
+        var nuevoEstado = juegoManager.obtenerEstado();
+        var jugador = leaderboardManager.obtenerJugador(myId);
+        mqttManager.publicarEstado({
+            nombre: myName,
+            figura: nuevoEstado.figuraActual,
+            celdas: nuevoEstado.celdasColocadas,
+            estado: nuevoEstado.completado ? 'completado' : 'jugando',
+            puntos: jugador ? jugador.puntos : 0,
+            figurasCompletadas: jugador ? jugador.figurasCompletadas : 0
+        });
+        
+        // Si se completó la figura, publicar completado
+        if (nuevoEstado.completado) {
+            mqttManager.publicarCompletar(myId);
+            mqttManager.publicarPuntuacion(myId, jugador ? jugador.puntos : 0);
+        }
     }
 }
 
@@ -590,6 +800,10 @@ function renderizarLeaderboard() {
         var estadoText = estado === 'completado' ? 'Completado' : 'Jugando';
         var estadoClass = estado === 'completado' ? 'completado' : '';
         
+        // Verificar si este jugador tiene datos en zoomManager
+        var zoomData = zoomManager.obtenerJugador(jugador.id);
+        var tieneZoom = zoomData !== null;
+        
         html += '<div class="player-card ' + (esMi ? 'me' : '') + '" data-player-id="' + jugador.id + '">';
         html += '    <span class="nombre">' + jugador.nombre + (esMi ? ' (Tu)' : '') + '</span>';
         html += '    <span>';
@@ -608,6 +822,12 @@ function renderizarLeaderboard() {
         card.addEventListener('click', function() {
             var id = this.dataset.playerId;
             if (id) {
+                console.log('Click en jugador:', id);
+                // Si es el jugador actual, mostrar un mensaje
+                if (id === myId) {
+                    alert('Este es tu tablero. Puedes verlo en la pantalla principal.');
+                    return;
+                }
                 mostrarZoom(id);
             }
         });

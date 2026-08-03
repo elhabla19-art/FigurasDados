@@ -6,6 +6,7 @@ class ZoomManager {
         this.jugadorSeleccionado = null;
         this.nivelZoom = 1;
         this.observers = [];
+        this.zoomCallbacks = [];
     }
 
     actualizarJugador(id, datos) {
@@ -28,14 +29,35 @@ class ZoomManager {
         }
         if (datos.estado) this.jugadores[id].estado = datos.estado;
         
+        // Calcular progreso
         if (this.jugadores[id].figura) {
             var total = this.jugadores[id].figura.celdas.length;
-            var colocadas = this.jugadores[id].celdasColocadas.length;
+            var colocadas = this.jugadores[id].celdasColocadas ? this.jugadores[id].celdasColocadas.length : 0;
             this.jugadores[id].progreso = calcularPorcentaje(colocadas, total);
         }
         
         this.jugadores[id].ultimaActualizacion = Date.now();
         this.notificar();
+        
+        // Si el zoom está abierto para este jugador, actualizar la vista directamente
+        if (this.jugadorSeleccionado === id) {
+            this.actualizarZoomDirecto(id);
+        }
+    }
+
+    actualizarZoomDirecto(id) {
+        var jugador = this.obtenerJugador(id);
+        if (jugador) {
+            // Llamar directamente a los callbacks registrados para zoom
+            for (var i = 0; i < this.zoomCallbacks.length; i++) {
+                this.zoomCallbacks[i](jugador);
+            }
+        }
+    }
+
+    // Registrar callback para actualizar zoom
+    registrarZoomCallback(callback) {
+        this.zoomCallbacks.push(callback);
     }
 
     eliminarJugador(id) {
@@ -55,6 +77,8 @@ class ZoomManager {
             this.jugadorSeleccionado = id;
             this.nivelZoom = 2;
             this.notificar();
+            // Actualizar zoom inmediatamente
+            this.actualizarZoomDirecto(id);
             return true;
         }
         return false;
@@ -194,6 +218,23 @@ class ZoomManager {
         }
         
         return idsAEliminar;
+    }
+
+    obtenerRankingProgreso() {
+        var jugadores = this.obtenerJugadores();
+        jugadores.sort(function(a, b) {
+            return b.progreso - a.progreso;
+        });
+        return jugadores;
+    }
+
+    obtenerLiderProgreso() {
+        var ranking = this.obtenerRankingProgreso();
+        return ranking.length > 0 ? ranking[0] : null;
+    }
+
+    estaEnZoom(id) {
+        return this.jugadorSeleccionado === id;
     }
 }
 
