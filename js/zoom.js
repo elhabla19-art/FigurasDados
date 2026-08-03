@@ -1,5 +1,7 @@
 import { clonarObjeto, calcularPorcentaje } from './utils.js';
+import { leaderboardManager } from './leaderboard.js';
 
+// ===== ZOOM MANAGER =====
 class ZoomManager {
     constructor() {
         this.jugadores = {};
@@ -7,9 +9,12 @@ class ZoomManager {
         this.nivelZoom = 1;
         this.observers = [];
         this.zoomCallbacks = [];
+        this.zoomPendiente = null;
     }
 
     actualizarJugador(id, datos) {
+        console.log('actualizarJugador llamado para:', id);
+        
         if (!this.jugadores[id]) {
             this.jugadores[id] = {
                 id: id,
@@ -20,16 +25,20 @@ class ZoomManager {
                 estado: 'jugando',
                 ultimaActualizacion: Date.now()
             };
+            console.log('Nuevo jugador creado en zoom:', id);
         }
         
         if (datos.nombre) this.jugadores[id].nombre = datos.nombre;
-        if (datos.figura) this.jugadores[id].figura = clonarObjeto(datos.figura);
+        if (datos.figura) {
+            this.jugadores[id].figura = clonarObjeto(datos.figura);
+            console.log('Figura actualizada para:', id);
+        }
         if (datos.celdasColocadas) {
             this.jugadores[id].celdasColocadas = clonarObjeto(datos.celdasColocadas);
+            console.log('Celdas actualizadas para:', id, datos.celdasColocadas.length);
         }
         if (datos.estado) this.jugadores[id].estado = datos.estado;
         
-        // Calcular progreso
         if (this.jugadores[id].figura) {
             var total = this.jugadores[id].figura.celdas.length;
             var colocadas = this.jugadores[id].celdasColocadas ? this.jugadores[id].celdasColocadas.length : 0;
@@ -38,26 +47,100 @@ class ZoomManager {
         
         this.jugadores[id].ultimaActualizacion = Date.now();
         this.notificar();
+        this.notificarZoomCallbacks(id);
         
-        // Si el zoom está abierto para este jugador, actualizar la vista directamente
-        if (this.jugadorSeleccionado === id) {
-            this.actualizarZoomDirecto(id);
+        // Si hay un zoom pendiente para este jugador, mostrarlo
+        if (this.zoomPendiente === id) {
+            console.log('Mostrando zoom pendiente para:', id);
+            this.zoomPendiente = null;
+            this.mostrarZoomDirecto(id);
         }
     }
 
-    actualizarZoomDirecto(id) {
+    notificarZoomCallbacks(id) {
         var jugador = this.obtenerJugador(id);
         if (jugador) {
-            // Llamar directamente a los callbacks registrados para zoom
             for (var i = 0; i < this.zoomCallbacks.length; i++) {
-                this.zoomCallbacks[i](jugador);
+                try {
+                    this.zoomCallbacks[i](jugador);
+                } catch (e) {
+                    console.error('Error en callback de zoom:', e);
+                }
             }
         }
     }
 
-    // Registrar callback para actualizar zoom
     registrarZoomCallback(callback) {
         this.zoomCallbacks.push(callback);
+        console.log('Callback de zoom registrado. Total:', this.zoomCallbacks.length);
+    }
+
+    // Método para mostrar zoom directamente desde el manager
+    mostrarZoomDirecto(id) {
+        var jugador = this.obtenerJugador(id);
+        if (!jugador) {
+            console.warn('Jugador no encontrado para mostrar zoom:', id);
+            this.zoomPendiente = id;
+            // Intentar obtener del leaderboard
+            var jugadorLB = leaderboardManager.obtenerJugador(id);
+            if (jugadorLB) {
+                this.actualizarJugador(id, {
+                    nombre: jugadorLB.nombre,
+                    figura: jugadorLB.figuraActual,
+                    celdasColocadas: jugadorLB.celdasColocadas || [],
+                    estado: jugadorLB.estado || 'jugando'
+                });
+                jugador = this.obtenerJugador(id);
+            }
+        }
+        
+        if (!jugador) {
+            console.error('No se pudo obtener el jugador para zoom:', id);
+            return false;
+        }
+        
+        // Notificar a los callbacks para que actualicen la UI
+        this.notificarZoomCallbacks(id);
+        this.jugadorSeleccionado = id;
+        this.nivelZoom = 2;
+        this.notificar();
+        return true;
+    }
+
+    // Método para solicitar zoom con espera de datos
+    solicitarZoom(id) {
+        console.log('solicitarZoom para:', id);
+        var jugador = this.obtenerJugador(id);
+        if (jugador && jugador.figura) {
+            // Si ya tiene datos, mostrar directamente
+            return this.mostrarZoomDirecto(id);
+        } else {
+            // Si no tiene datos, marcar como pendiente
+            console.log('Zoom pendiente para:', id);
+            this.zoomPendiente = id;
+            
+            // Intentar obtener del leaderboard
+            var jugadorLB = leaderboardManager.obtenerJugador(id);
+            if (jugadorLB && jugadorLB.figuraActual) {
+                this.actualizarJugador(id, {
+                    nombre: jugadorLB.nombre,
+                    figura: jugadorLB.figuraActual,
+                    celdasColocadas: jugadorLB.celdasColocadas || [],
+                    estado: jugadorLB.estado || 'jugando'
+                });
+                return this.mostrarZoomDirecto(id);
+            }
+            
+            // Si no hay datos, solicitar sincronización
+            if (mqttManager && mqttManager.isConnected()) {
+                mqttManager.publicar('estado', { 
+                    accion: 'sync_request',
+                    targetId: id 
+                });
+            }
+            
+            return false;
+        }
     }
 
     eliminarJugador(id) {
@@ -66,6 +149,9 @@ class ZoomManager {
             if (this.jugadorSeleccionado === id) {
                 this.jugadorSeleccionado = null;
             }
+            if (this.zoomPendiente === id) {
+                this.zoomPendiente = null;
+            }
             this.notificar();
             return true;
         }
@@ -73,19 +159,13 @@ class ZoomManager {
     }
 
     seleccionarJugador(id) {
-        if (this.jugadores[id]) {
-            this.jugadorSeleccionado = id;
-            this.nivelZoom = 2;
-            this.notificar();
-            // Actualizar zoom inmediatamente
-            this.actualizarZoomDirecto(id);
-            return true;
-        }
-        return false;
+        console.log('seleccionarJugador:', id);
+        return this.solicitarZoom(id);
     }
 
     deseleccionarJugador() {
         this.jugadorSeleccionado = null;
+        this.zoomPendiente = null;
         this.nivelZoom = 1;
         this.notificar();
     }
@@ -104,15 +184,18 @@ class ZoomManager {
     }
 
     obtenerJugador(id) {
-        if (!this.jugadores[id]) return null;
+        if (!this.jugadores[id]) {
+            return null;
+        }
+        var jugador = this.jugadores[id];
         return {
-            id: this.jugadores[id].id,
-            nombre: this.jugadores[id].nombre,
-            figura: this.jugadores[id].figura,
-            celdasColocadas: this.jugadores[id].celdasColocadas,
-            progreso: this.jugadores[id].progreso,
-            estado: this.jugadores[id].estado || 'jugando',
-            ultimaActualizacion: this.jugadores[id].ultimaActualizacion
+            id: jugador.id,
+            nombre: jugador.nombre,
+            figura: jugador.figura,
+            celdasColocadas: jugador.celdasColocadas,
+            progreso: jugador.progreso,
+            estado: jugador.estado || 'jugando',
+            ultimaActualizacion: jugador.ultimaActualizacion
         };
     }
 
@@ -130,44 +213,6 @@ class ZoomManager {
         });
     }
 
-    obtenerJugadoresActivos() {
-        var ahora = Date.now();
-        var limite = 30000;
-        return Object.values(this.jugadores)
-            .filter(function(j) { return ahora - j.ultimaActualizacion < limite; })
-            .map(function(j) {
-                return {
-                    id: j.id,
-                    nombre: j.nombre,
-                    figura: j.figura,
-                    celdasColocadas: j.celdasColocadas,
-                    progreso: j.progreso,
-                    estado: j.estado || 'jugando',
-                    ultimaActualizacion: j.ultimaActualizacion
-                };
-            });
-    }
-
-    obtenerProgreso(id) {
-        if (!this.jugadores[id]) return null;
-        return this.jugadores[id].progreso;
-    }
-
-    obtenerEstado(id) {
-        if (!this.jugadores[id]) return null;
-        return this.jugadores[id].estado;
-    }
-
-    obtenerFigura(id) {
-        if (!this.jugadores[id]) return null;
-        return this.jugadores[id].figura;
-    }
-
-    obtenerCeldas(id) {
-        if (!this.jugadores[id]) return null;
-        return this.jugadores[id].celdasColocadas;
-    }
-
     suscribir(callback) {
         this.observers.push(callback);
     }
@@ -183,8 +228,16 @@ class ZoomManager {
             nivelZoom: this.nivelZoom
         };
         for (var i = 0; i < this.observers.length; i++) {
-            this.observers[i](data);
+            try {
+                this.observers[i](data);
+            } catch (e) {
+                console.error('Error en observer:', e);
+            }
         }
+    }
+
+    estaEnZoom(id) {
+        return this.jugadorSeleccionado === id;
     }
 
     exportarDatos() {
@@ -219,27 +272,194 @@ class ZoomManager {
         
         return idsAEliminar;
     }
-
-    obtenerRankingProgreso() {
-        var jugadores = this.obtenerJugadores();
-        jugadores.sort(function(a, b) {
-            return b.progreso - a.progreso;
-        });
-        return jugadores;
-    }
-
-    obtenerLiderProgreso() {
-        var ranking = this.obtenerRankingProgreso();
-        return ranking.length > 0 ? ranking[0] : null;
-    }
-
-    estaEnZoom(id) {
-        return this.jugadorSeleccionado === id;
-    }
 }
 
 // Crear instancia singleton
 var zoomManager = new ZoomManager();
 
-// Exportar para usar en otros modulos
-export { ZoomManager, zoomManager };
+// ===== ZOOM HANDLER =====
+let zoomModal, zoomBoard, zoomJugadorNombre, zoomInfo;
+let zoomInicializado = false;
+let zoomJugadorActual = null;
+
+function initZoomUI() {
+    if (zoomInicializado) return;
+    zoomModal = document.getElementById('zoomModal');
+    zoomBoard = document.getElementById('zoomBoard');
+    zoomJugadorNombre = document.getElementById('zoomJugadorNombre');
+    zoomInfo = document.getElementById('zoomInfo');
+    zoomInicializado = true;
+    console.log('Zoom UI inicializado');
+}
+
+function mostrarZoom(jugadorId) {
+    console.log('mostrarZoom llamado para:', jugadorId);
+    initZoomUI();
+    
+    // Mostrar loading mientras se obtienen los datos
+    zoomJugadorNombre.textContent = 'Cargando...';
+    zoomBoard.innerHTML = '<p>Cargando datos del jugador...</p>';
+    zoomInfo.innerHTML = '';
+    zoomModal.style.display = 'flex';
+    
+    // Solicitar zoom al manager (con espera de datos si es necesario)
+    var success = zoomManager.solicitarZoom(jugadorId);
+    
+    if (!success) {
+        // Si no se pudo obtener inmediatamente, mostrar mensaje de espera
+        zoomJugadorNombre.textContent = 'Esperando datos...';
+        zoomBoard.innerHTML = '<p>Esperando sincronización...</p>';
+        
+        // Programar reintento después de 1 segundo
+        setTimeout(function() {
+            var jugador = zoomManager.obtenerJugador(jugadorId);
+            if (jugador && jugador.figura) {
+                actualizarZoomDirecto(jugador);
+            } else {
+                // Intentar una vez más
+                var jugadorLB = leaderboardManager.obtenerJugador(jugadorId);
+                if (jugadorLB && jugadorLB.figuraActual) {
+                    zoomManager.actualizarJugador(jugadorId, {
+                        nombre: jugadorLB.nombre,
+                        figura: jugadorLB.figuraActual,
+                        celdasColocadas: jugadorLB.celdasColocadas || [],
+                        estado: jugadorLB.estado || 'jugando'
+                    });
+                    var jugador2 = zoomManager.obtenerJugador(jugadorId);
+                    if (jugador2) {
+                        actualizarZoomDirecto(jugador2);
+                    }
+                }
+            }
+        }, 1000);
+    }
+}
+
+function cerrarZoom() {
+    if (!zoomInicializado) initZoomUI();
+    zoomModal.style.display = 'none';
+    zoomJugadorActual = null;
+    zoomManager.deseleccionarJugador();
+}
+
+function actualizarZoomDirecto(jugador) {
+    if (!zoomInicializado) initZoomUI();
+    if (!jugador) {
+        console.warn('actualizarZoomDirecto: jugador es null');
+        return;
+    }
+    
+    console.log('actualizarZoomDirecto para:', jugador.nombre);
+    console.log('Figura:', jugador.figura);
+    console.log('Celdas colocadas:', jugador.celdasColocadas);
+    
+    // Verificar si el zoom está abierto
+    if (zoomModal.style.display !== 'flex') {
+        console.log('Zoom no está abierto, no se actualiza');
+        return;
+    }
+    
+    // Verificar que el jugador en zoom sea el mismo
+    if (zoomJugadorActual && zoomJugadorActual !== jugador.id) {
+        console.log('El jugador en zoom no coincide:', zoomJugadorActual, 'vs', jugador.id);
+        return;
+    }
+    
+    // Si no hay figura, mostrar mensaje
+    if (!jugador.figura || !jugador.figura.celdas) {
+        zoomJugadorNombre.textContent = jugador.nombre;
+        zoomBoard.innerHTML = '<p>Esperando figura...</p>';
+        zoomInfo.innerHTML = 'Progreso: 0/0 (0%) - Esperando';
+        return;
+    }
+    
+    zoomJugadorNombre.textContent = jugador.nombre;
+    zoomBoard.innerHTML = renderizarZoomTablero(jugador);
+    
+    var progreso = jugador.progreso || 0;
+    var estado = jugador.estado || 'jugando';
+    var total = jugador.figura ? jugador.figura.celdas.length : 0;
+    var colocadas = jugador.celdasColocadas ? jugador.celdasColocadas.length : 0;
+    
+    zoomInfo.innerHTML = 'Progreso: ' + colocadas + '/' + total + ' (' + progreso + '%) - ' + 
+                         (estado === 'completado' ? 'Completado!' : 'Jugando');
+    
+    console.log('Zoom actualizado correctamente');
+}
+
+function renderizarZoomTablero(jugador) {
+    var figura = jugador.figura;
+    var celdasColocadas = jugador.celdasColocadas || [];
+    
+    if (!figura || !figura.celdas) {
+        return '<p>Esperando figura...</p>';
+    }
+    
+    var celdas = figura.celdas;
+    var xs = celdas.map(function(c) { return c.x; });
+    var ys = celdas.map(function(c) { return c.y; });
+    var minX = Math.min.apply(null, xs);
+    var maxX = Math.max.apply(null, xs);
+    var minY = Math.min.apply(null, ys);
+    var maxY = Math.max.apply(null, ys);
+    var ancho = maxX - minX + 1;
+    
+    var html = '<div class="dice-grid" style="grid-template-columns: repeat(' + ancho + ', 1fr);">';
+    
+    for (var y = minY; y <= maxY; y++) {
+        for (var x = minX; x <= maxX; x++) {
+            var celda = null;
+            for (var i = 0; i < celdas.length; i++) {
+                if (celdas[i].x === x && celdas[i].y === y) {
+                    celda = celdas[i];
+                    break;
+                }
+            }
+            
+            var colocada = false;
+            for (var j = 0; j < celdasColocadas.length; j++) {
+                if (celdasColocadas[j].x === x && celdasColocadas[j].y === y) {
+                    colocada = true;
+                    break;
+                }
+            }
+            
+            var esInicio = figura.inicio && figura.inicio.x === x && figura.inicio.y === y;
+            var completado = jugador.estado === 'completado';
+            
+            var clases = 'dice-cell';
+            if (!celda) {
+                clases += ' vacio';
+            } else if (completado) {
+                clases += ' completado';
+            } else if (colocada) {
+                clases += ' colocado';
+            } else {
+                clases += ' disponible';
+            }
+            if (esInicio) {
+                clases += ' inicio';
+            }
+            
+            var valor = celda ? celda.valor : '';
+            html += '<div class="' + clases + '">';
+            if (celda) {
+                html += '<span class="dice-value">' + valor + '</span>';
+            }
+            html += '</div>';
+        }
+    }
+    
+    html += '</div>';
+    return html;
+}
+
+// Exportar
+export {
+    zoomManager,
+    initZoomUI,
+    mostrarZoom,
+    cerrarZoom,
+    actualizarZoomDirecto,
+    renderizarZoomTablero
+};
