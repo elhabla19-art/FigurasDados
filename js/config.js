@@ -68,6 +68,8 @@ function publicarCambioLocal(estado) {
         celdas: estado.celdasColocadas,
         estado: estado.completado ? 'completado' : 'jugando',
         puntos: jugador?.puntos || 0,
+        puntosSimples: jugador?.puntosSimples || 0,
+        puntosGrupales: jugador?.puntosGrupales || 0,
         figurasCompletadas: jugador?.figurasCompletadas || 0,
         modoFigura: estado.modoFigura || 'simple'
     };
@@ -335,6 +337,12 @@ function manejarEstadoCompleto(data) {
     if (data.puntos !== undefined) {
         leaderboardManager.establecerPuntuacion(jugadorId, data.puntos);
     }
+    if (data.puntosSimples !== undefined) {
+        leaderboardManager.establecerPuntosSimples(jugadorId, data.puntosSimples);
+    }
+    if (data.puntosGrupales !== undefined) {
+        leaderboardManager.establecerPuntosGrupales(jugadorId, data.puntosGrupales);
+    }
     if (data.estado) {
         leaderboardManager.actualizarEstado(jugadorId, data.estado);
     }
@@ -421,7 +429,7 @@ export function handleCellClick(x, y, estaColocada) {
         return;
     }
     
-    // Deshacer si ya está colocada
+    // Si la celda ya está colocada, deshacer
     if (estaColocada) {
         if (juegoManager.deshacerCelda(x, y)) {
             if (config.modoJuego === 'multi' && mqttManager.isConnected()) {
@@ -432,23 +440,26 @@ export function handleCellClick(x, y, estaColocada) {
         return;
     }
     
+    // Verificar que la celda pertenece a la figura
+    if (!juegoManager.esCeldaDeFigura(x, y)) {
+        return;
+    }
+    
     // Colocar dado
-    if (juegoManager.esCeldaDisponible(x, y)) {
-        if (juegoManager.colocarDado(x, y)) {
-            if (config.modoJuego === 'multi' && mqttManager.isConnected()) {
-                setTimeout(publicarEstadoCompleto, 50);
-                
-                const nuevoEstado = juegoManager.obtenerEstado();
-                if (nuevoEstado.completado) {
-                    mqttManager.publicarCompletar(config.myId);
-                    const jugador = leaderboardManager.obtenerJugador(config.myId);
-                    if (jugador) {
-                        mqttManager.publicarPuntuacion(config.myId, jugador.puntos);
-                    }
+    if (juegoManager.colocarDado(x, y)) {
+        if (config.modoJuego === 'multi' && mqttManager.isConnected()) {
+            setTimeout(publicarEstadoCompleto, 50);
+            
+            const nuevoEstado = juegoManager.obtenerEstado();
+            if (nuevoEstado.completado) {
+                mqttManager.publicarCompletar(config.myId);
+                const jugador = leaderboardManager.obtenerJugador(config.myId);
+                if (jugador) {
+                    mqttManager.publicarPuntuacion(config.myId, jugador.puntos);
                 }
             }
-            actualizarBotonesFigura();
         }
+        actualizarBotonesFigura();
     }
 }
 

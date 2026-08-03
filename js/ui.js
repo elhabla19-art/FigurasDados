@@ -31,9 +31,10 @@ function handleBoardClick(e) {
     if (isNaN(x) || isNaN(y)) return;
     
     const colocada = cell.dataset.colocada === 'true';
-    const disponible = cell.dataset.disponible === 'true';
+    const esDeFigura = cell.dataset.esfigura === 'true';
     
-    if (!disponible && !colocada) return;
+    // Si no es de la figura o está completado, ignorar
+    if (!esDeFigura) return;
     
     handleCellClick(x, y, colocada);
 }
@@ -81,8 +82,6 @@ export function renderizarTablero(estado) {
     const maxY = Math.max(...ys);
     const ancho = maxX - minX + 1;
     
-    const disponibles = juegoManager.obtenerCeldasDisponibles();
-    const disponiblesSet = new Set(disponibles.map(c => `${c.x},${c.y}`));
     const colocadasSet = new Set(celdasColocadas.map(c => `${c.x},${c.y}`));
     
     let html = `<div class="dice-grid" style="grid-template-columns: repeat(${ancho}, 1fr);">`;
@@ -98,22 +97,25 @@ export function renderizarTablero(estado) {
             
             const id = `${x},${y}`;
             const colocada = colocadasSet.has(id);
-            const esInicio = figuraActual.inicio.x === x && figuraActual.inicio.y === y;
-            const disponible = !completado && !colocada && disponiblesSet.has(id);
             
-            let clases = 'dice-cell';
-            if (completado) clases += ' completado';
-            else if (colocada) clases += ' colocado';
-            else if (disponible) clases += ' disponible';
-            if (esInicio) clases += ' inicio';
+            // Determinar clase:
+            // - completado: si la figura está completada
+            // - colocado: si la celda está marcada
+            // - normal: si no está marcada (sin borde especial)
+            let clase = 'dice-cell';
+            if (completado) {
+                clase += ' completado';
+            } else if (colocada) {
+                clase += ' colocado';
+            }
+            // Si no está colocada, solo 'dice-cell' (sin borde verde)
             
             html += `
-                <div class="${clases}" 
+                <div class="${clase}" 
                      data-x="${x}" data-y="${y}" 
                      data-colocada="${colocada}" 
-                     data-disponible="${disponible}">
+                     data-esfigura="true">
                     <span class="dice-value">${celda.valor}</span>
-                    ${esInicio ? '<span class="dice-indice">I</span>' : ''}
                 </div>
             `;
         }
@@ -144,23 +146,28 @@ export function renderizarLeaderboard() {
     for (const jugador of ranking) {
         const esMi = jugador.id === myId;
         const estado = jugador.estado || 'jugando';
-        const estadoText = estado === 'completado' ? 'Completado' : 'Jugando';
+        const estadoText = estado === 'completado' ? '✅ Completado' : '🎯 Jugando';
         const estadoClass = estado === 'completado' ? 'completado' : '';
         
         html += `
             <div class="player-card ${esMi ? 'me' : ''}" data-player-id="${jugador.id}">
-                <span class="nombre">${jugador.nombre}${esMi ? ' (Tu)' : ''}</span>
-                <span>
+                <div class="player-info">
+                    <span class="nombre">${jugador.nombre}${esMi ? ' (Tu)' : ''}</span>
                     <span class="estado ${estadoClass}">${estadoText}</span>
-                    <span class="puntos">${jugador.puntos}</span>
-                </span>
+                </div>
+                <div class="player-puntos">
+                    <span class="puntos-total">${jugador.puntos}</span>
+                    <div class="puntos-detalle">
+                        <span class="puntos-simples">S:${jugador.puntosSimples}</span>
+                        <span class="puntos-grupales">G:${jugador.puntosGrupales}</span>
+                    </div>
+                </div>
             </div>
         `;
     }
     
     playersList.innerHTML = html;
     
-    // Event listeners para zoom
     playersList.querySelectorAll('.player-card').forEach(card => {
         card.addEventListener('click', function() {
             const id = this.dataset.playerId;
@@ -171,5 +178,4 @@ export function renderizarLeaderboard() {
     });
 }
 
-// Re-exportar funciones de zoom para compatibilidad
 export { mostrarZoom, actualizarZoomDirecto, renderizarZoomTablero };

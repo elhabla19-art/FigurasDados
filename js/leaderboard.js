@@ -17,6 +17,8 @@ class LeaderboardManager {
                 id,
                 nombre,
                 puntos: 0,
+                puntosSimples: 0,
+                puntosGrupales: 0,
                 figurasCompletadas: 0,
                 celdasColocadas: [],
                 figuraActual: null,
@@ -43,6 +45,20 @@ class LeaderboardManager {
     establecerPuntuacion(id, puntos) {
         if (!this.jugadores[id]) return false;
         this.jugadores[id].puntos = puntos;
+        this.notificar();
+        return true;
+    }
+
+    establecerPuntosSimples(id, puntos) {
+        if (!this.jugadores[id]) return false;
+        this.jugadores[id].puntosSimples = puntos;
+        this.notificar();
+        return true;
+    }
+
+    establecerPuntosGrupales(id, puntos) {
+        if (!this.jugadores[id]) return false;
+        this.jugadores[id].puntosGrupales = puntos;
         this.notificar();
         return true;
     }
@@ -75,6 +91,8 @@ class LeaderboardManager {
                 id: j.id,
                 nombre: j.nombre,
                 puntos: j.puntos,
+                puntosSimples: j.puntosSimples || 0,
+                puntosGrupales: j.puntosGrupales || 0,
                 figurasCompletadas: j.figurasCompletadas || 0,
                 celdasColocadas: j.celdasColocadas || [],
                 figuraActual: j.figuraActual,
@@ -90,6 +108,8 @@ class LeaderboardManager {
             id: j.id,
             nombre: j.nombre,
             puntos: j.puntos,
+            puntosSimples: j.puntosSimples || 0,
+            puntosGrupales: j.puntosGrupales || 0,
             figurasCompletadas: j.figurasCompletadas || 0,
             celdasColocadas: j.celdasColocadas || [],
             figuraActual: j.figuraActual,
@@ -102,6 +122,8 @@ class LeaderboardManager {
             id: j.id,
             nombre: j.nombre,
             puntos: j.puntos,
+            puntosSimples: j.puntosSimples || 0,
+            puntosGrupales: j.puntosGrupales || 0,
             figurasCompletadas: j.figurasCompletadas || 0,
             celdasColocadas: j.celdasColocadas || [],
             figuraActual: j.figuraActual,

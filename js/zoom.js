@@ -212,7 +212,7 @@ export function actualizarZoomDirecto(jugador) {
     const colocadas = jugador.celdasColocadas?.length || 0;
     const total = jugador.figura.celdas.length;
     const estado = jugador.estado || 'jugando';
-    zoomInfo.innerHTML = `Progreso: ${colocadas}/${total} (${jugador.progreso || 0}%) - ${estado === 'completado' ? 'Completado!' : 'Jugando'}`;
+    zoomInfo.innerHTML = `Progreso: ${colocadas}/${total} (${jugador.progreso || 0}%) - ${estado === 'completado' ? '✅ Completado!' : '🎯 Jugando'}`;
 }
 
 export function renderizarZoomTablero(jugador) {
@@ -246,7 +246,7 @@ export function renderizarZoomTablero(jugador) {
             
             const id = `${x},${y}`;
             const colocada = colocadasSet.has(id);
-            const esInicio = figura.inicio?.x === x && figura.inicio?.y === y;
+            // ELIMINADO: referencia a inicio
             const completado = jugador.estado === 'completado';
             
             let clases = 'dice-cell';
@@ -254,7 +254,7 @@ export function renderizarZoomTablero(jugador) {
             else if (completado) clases += ' completado';
             else if (colocada) clases += ' colocado';
             else clases += ' disponible';
-            if (esInicio) clases += ' inicio';
+            // ELIMINADO: clase inicio
             
             html += `
                 <div class="${clases}">

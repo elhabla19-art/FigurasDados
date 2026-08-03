@@ -21,6 +21,9 @@ class JuegoManager {
         this.celdasGrupales = [];
         this.contribuciones = {};
         this.puntosPorCelda = {};
+        this.puntajesAcumulados = {};
+        this.puntajesGrupales = {};
+        this.puntajesSimples = {};
     }
 
     iniciarVacio(jugadorId) {
@@ -59,6 +62,15 @@ class JuegoManager {
         leaderboardManager.actualizarFigura(jugadorId, this.estado.figuraActual);
         leaderboardManager.actualizarCeldas(jugadorId, []);
         
+        if (!this.puntajesSimples[jugadorId]) {
+            this.puntajesSimples[jugadorId] = 0;
+        }
+        
+        const total = this.puntajesSimples[jugadorId] + (this.puntajesGrupales[jugadorId] || 0);
+        leaderboardManager.establecerPuntuacion(jugadorId, total);
+        leaderboardManager.establecerPuntosSimples(jugadorId, this.puntajesSimples[jugadorId]);
+        leaderboardManager.establecerPuntosGrupales(jugadorId, this.puntajesGrupales[jugadorId] || 0);
+        
         zoomManager.actualizarJugador(jugadorId, {
             figura: this.estado.figuraActual,
             celdasColocadas: [],
@@ -85,12 +97,14 @@ class JuegoManager {
         leaderboardManager.actualizarFigura(jugadorId, this.estado.figuraActual);
         leaderboardManager.actualizarCeldas(jugadorId, []);
         
-        // Inicializar puntuaciones
-        const jugadores = leaderboardManager.obtenerJugadores();
-        jugadores.forEach(j => {
-            leaderboardManager.establecerPuntuacion(j.id, 0);
-            this.puntosPorCelda[j.id] = 0;
-        });
+        if (!this.puntajesGrupales[jugadorId]) {
+            this.puntajesGrupales[jugadorId] = 0;
+        }
+        
+        const total = (this.puntajesSimples[jugadorId] || 0) + (this.puntajesGrupales[jugadorId] || 0);
+        leaderboardManager.establecerPuntuacion(jugadorId, total);
+        leaderboardManager.establecerPuntosSimples(jugadorId, this.puntajesSimples[jugadorId] || 0);
+        leaderboardManager.establecerPuntosGrupales(jugadorId, this.puntajesGrupales[jugadorId] || 0);
         
         zoomManager.actualizarJugador(jugadorId, {
             figura: this.estado.figuraActual,
@@ -136,17 +150,9 @@ class JuegoManager {
         const celdasActuales = this.obtenerCeldasActuales();
         if (celdasActuales.some(c => c.x === x && c.y === y)) return false;
         
-        // Verificar adyacencia
-        if (celdasActuales.length > 0) {
-            const esAdyacente = celdasActuales.some(c => 
-                Math.abs(c.x - x) + Math.abs(c.y - y) === 1
-            );
-            if (!esAdyacente) return false;
-        } else {
-            // Primera celda debe ser el inicio
-            const inicio = this.estado.figuraActual.inicio;
-            if (x !== inicio.x || y !== inicio.y) return false;
-        }
+        // Verificar que la celda pertenece a la figura
+        const perteneceFigura = this.estado.figuraActual.celdas.some(c => c.x === x && c.y === y);
+        if (!perteneceFigura) return false;
         
         // Colocar
         if (this.estado.modoFigura === 'grupal') {
@@ -159,7 +165,10 @@ class JuegoManager {
             this.contribuciones[this.estado.jugadorId].push(nuevaCelda);
             
             this.puntosPorCelda[this.estado.jugadorId] = (this.puntosPorCelda[this.estado.jugadorId] || 0) + 1;
-            leaderboardManager.establecerPuntuacion(this.estado.jugadorId, this.puntosPorCelda[this.estado.jugadorId]);
+            this.puntajesGrupales[this.estado.jugadorId] = (this.puntajesGrupales[this.estado.jugadorId] || 0) + 1;
+            const total = (this.puntajesSimples[this.estado.jugadorId] || 0) + (this.puntajesGrupales[this.estado.jugadorId] || 0);
+            leaderboardManager.establecerPuntuacion(this.estado.jugadorId, total);
+            leaderboardManager.establecerPuntosGrupales(this.estado.jugadorId, this.puntajesGrupales[this.estado.jugadorId]);
         } else {
             this.estado.celdasColocadas.push(nuevaCelda);
         }
@@ -206,7 +215,10 @@ class JuegoManager {
         this.estado.completado = true;
         
         if (this.estado.modoFigura === 'simple') {
-            leaderboardManager.actualizarPuntuacion(this.estado.jugadorId, 1);
+            this.puntajesSimples[this.estado.jugadorId] = (this.puntajesSimples[this.estado.jugadorId] || 0) + 1;
+            const total = (this.puntajesSimples[this.estado.jugadorId] || 0) + (this.puntajesGrupales[this.estado.jugadorId] || 0);
+            leaderboardManager.establecerPuntuacion(this.estado.jugadorId, total);
+            leaderboardManager.establecerPuntosSimples(this.estado.jugadorId, this.puntajesSimples[this.estado.jugadorId]);
         }
         
         zoomManager.actualizarJugador(this.estado.jugadorId, { estado: 'completado' });
@@ -229,26 +241,30 @@ class JuegoManager {
         const celdasActuales = this.obtenerCeldasActuales();
         const index = celdasActuales.findIndex(c => c.x === x && c.y === y);
         
-        if (index === -1 || index !== celdasActuales.length - 1) return false;
+        if (index === -1) return false;
+        
+        // Solo se puede deshacer la última celda colocada
+        if (index !== celdasActuales.length - 1) return false;
         
         const celdaRemovida = celdasActuales.pop();
         
         if (this.estado.modoFigura === 'grupal') {
-            // Actualizar contribuciones
             for (const jugadorId in this.contribuciones) {
                 const contribs = this.contribuciones[jugadorId];
                 const idx = contribs.findIndex(c => c.x === x && c.y === y);
                 if (idx !== -1) {
                     contribs.splice(idx, 1);
                     this.puntosPorCelda[jugadorId] = (this.puntosPorCelda[jugadorId] || 1) - 1;
-                    leaderboardManager.establecerPuntuacion(jugadorId, this.puntosPorCelda[jugadorId]);
+                    this.puntajesGrupales[jugadorId] = (this.puntajesGrupales[jugadorId] || 0) - 1;
+                    const total = (this.puntajesSimples[jugadorId] || 0) + (this.puntajesGrupales[jugadorId] || 0);
+                    leaderboardManager.establecerPuntuacion(jugadorId, total);
+                    leaderboardManager.establecerPuntosGrupales(jugadorId, this.puntajesGrupales[jugadorId] || 0);
                     break;
                 }
             }
             this.estado.celdasColocadas = this.celdasGrupales;
         }
         
-        // Limpiar historial de deshacer
         const historial = deshacerManager.obtenerHistorial();
         for (let i = historial.length - 1; i >= 0; i--) {
             if (historial[i].tipo === 'colocar' && 
@@ -275,9 +291,6 @@ class JuegoManager {
             this.estado.celdasColocadas = this.celdasGrupales;
             this.contribuciones = {};
             this.puntosPorCelda = {};
-            leaderboardManager.obtenerJugadores().forEach(j => {
-                leaderboardManager.establecerPuntuacion(j.id, 0);
-            });
         } else {
             this.estado.celdasColocadas = [];
         }
@@ -293,44 +306,20 @@ class JuegoManager {
         this.notificar();
     }
 
-    obtenerCeldasDisponibles() {
-        if (!this.estado.figuraActual) return [];
-        
+    esCeldaColocada(x, y) {
         const celdasActuales = this.obtenerCeldasActuales();
-        const colocadasIds = new Set(celdasActuales.map(c => `${c.x},${c.y}`));
-        const disponibles = [];
-        
-        for (const celda of this.estado.figuraActual.celdas) {
-            const id = `${celda.x},${celda.y}`;
-            if (colocadasIds.has(id)) continue;
-            
-            if (celdasActuales.length === 0) {
-                if (celda.x === this.estado.figuraActual.inicio.x && 
-                    celda.y === this.estado.figuraActual.inicio.y) {
-                    disponibles.push({ x: celda.x, y: celda.y, valor: celda.valor });
-                }
-            } else {
-                const esAdyacente = celdasActuales.some(c => 
-                    Math.abs(c.x - celda.x) + Math.abs(c.y - celda.y) === 1
-                );
-                if (esAdyacente) {
-                    disponibles.push({ x: celda.x, y: celda.y, valor: celda.valor });
-                }
-            }
-        }
-        
-        return disponibles;
+        return celdasActuales.some(c => c.x === x && c.y === y);
     }
 
-    esCeldaDisponible(x, y) {
-        return this.obtenerCeldasDisponibles().some(c => c.x === x && c.y === y);
+    esCeldaDeFigura(x, y) {
+        if (!this.estado.figuraActual) return false;
+        return this.estado.figuraActual.celdas.some(c => c.x === x && c.y === y);
     }
 
     obtenerEstado() {
         return {
             ...this.estado,
             celdasColocadas: this.obtenerCeldasActuales().slice(),
-            disponibles: this.obtenerCeldasDisponibles(),
             progreso: obtenerProgreso(this.estado.figuraActual, this.obtenerCeldasActuales())
         };
     }

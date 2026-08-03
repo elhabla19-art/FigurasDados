@@ -144,11 +144,6 @@ body {
     opacity: 0.6;
 }
 
-#zoomBoard .dice-cell.inicio {
-    border-color: var(--color-warning);
-    border-width: 3px;
-}
-
 #zoomBoard .dice-cell.vacio {
     background: transparent;
     border-color: transparent;
@@ -197,7 +192,7 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     position: relative;
 }
 
-/* ===== ESTILOS DE CELDAS CORREGIDOS ===== */
+/* ===== ESTILOS DE CELDAS ===== */
 .dice-cell {
     width: 50px;
     height: 50px;
@@ -211,10 +206,11 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     font-weight: bold;
     user-select: none;
     position: relative;
-    transition: border-color 0.2s, opacity 0.2s;
+    transition: border-color 0.2s, background 0.2s;
+    cursor: pointer;
 }
 
-/* CELDAS VACÍAS - sin interacción */
+/* CELDAS VACÍAS - transparentes, sin interacción */
 .dice-cell.vacio {
     background: transparent;
     border-color: transparent;
@@ -222,37 +218,14 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     pointer-events: none;
 }
 
-/* CELDAS DISPONIBLES - clickeables con hover */
-.dice-cell.disponible {
-    border-color: var(--color-success);
-    border-style: dashed;
-    animation: pulse 1.5s ease-in-out infinite;
-    cursor: pointer;
-}
-
-.dice-cell.disponible:hover {
-    border-color: var(--color-primary);
-    border-style: solid;
-    transform: scale(1.05);
-    animation: none;
-}
-
-.dice-cell.disponible:active {
-    transform: scale(0.95);
-}
-
-/* CELDAS COLOCADAS - clickeables para deshacer */
+/* CELDAS COLOCADAS (marcadas) - borde verde */
 .dice-cell.colocado {
     background: var(--bg-box-marked);
     border-color: var(--color-success);
-    cursor: pointer;
-    opacity: 0.85;
 }
 
 .dice-cell.colocado:hover {
     border-color: var(--color-danger);
-    opacity: 1;
-    transform: none;
 }
 
 .dice-cell.colocado .dice-value {
@@ -272,74 +245,9 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     color: white;
 }
 
-/* CELDA DE INICIO */
-.dice-cell.inicio {
-    border-color: var(--color-warning);
-    border-width: 3px;
-}
-
 .dice-cell .dice-value {
     font-size: 1.6rem;
     font-weight: 900;
-}
-
-.dice-cell .dice-indice {
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    background: var(--color-primary);
-    color: white;
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    font-size: 0.65rem;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-weight: bold;
-}
-
-.dice-cell .dice-orden {
-    position: absolute;
-    bottom: -8px;
-    left: -8px;
-    background: var(--bg-box);
-    color: var(--text-muted);
-    border-radius: 50%;
-    width: 18px;
-    height: 18px;
-    font-size: 0.6rem;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border: 1px solid var(--border-color);
-}
-
-/* BADGE DE CONTRIBUCIÓN (modo grupal) */
-.dice-cell .contribucion-badge {
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    background: var(--color-primary);
-    color: white;
-    border-radius: 50%;
-    width: 18px;
-    height: 18px;
-    font-size: 0.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    border: 1px solid var(--bg-main);
-}
-
-.dice-cell .contribucion-badge.grupal {
-    background: var(--color-grupal);
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 1; }
 }
 
 /* SIDE PANEL */
@@ -446,36 +354,53 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     border-left: 3px solid var(--color-primary); 
 }
 
+.player-card .player-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
 .player-card .nombre {
     font-weight: bold;
     font-size: 0.95rem;
     color: #fff;
 }
 
-.player-card .puntos {
-    font-weight: bold;
-    font-size: 0.95rem;
-    color: var(--color-primary);
-}
-
-.player-card .puntos.grupal {
-    color: var(--color-grupal);
-}
-
 .player-card .estado {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: var(--text-muted);
-    margin-left: 8px;
 }
 
 .player-card .estado.completado {
     color: var(--color-success);
 }
 
-.player-card .contribuciones {
+.player-card .player-puntos {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.player-card .puntos-total {
+    font-weight: bold;
+    font-size: 1rem;
+    color: var(--color-primary);
+}
+
+.player-card .puntos-detalle {
+    display: flex;
+    gap: 6px;
     font-size: 0.7rem;
+}
+
+.player-card .puntos-simples {
+    color: var(--color-simple);
+}
+
+.player-card .puntos-grupales {
     color: var(--color-grupal);
-    margin-left: 8px;
 }
 
 /* RESPONSIVE */
@@ -487,9 +412,6 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     .board { min-height: 120px; padding: 6px; }
     .dice-cell { width: 35px; height: 35px; font-size: 1rem; }
     .dice-cell .dice-value { font-size: 1.2rem; }
-    .dice-cell .dice-indice { width: 14px; height: 14px; font-size: 0.5rem; top: -6px; right: -6px; }
-    .dice-cell .dice-orden { width: 14px; height: 14px; font-size: 0.5rem; bottom: -6px; left: -6px; }
-    .dice-cell .contribucion-badge { width: 14px; height: 14px; font-size: 0.4rem; top: -6px; right: -6px; }
     .side-panel { flex: 1; max-width: 250px; justify-content: flex-start; overflow-y: auto; padding-right: 4px; }
     .scoreboard { padding: 6px 10px; }
     .puntos-total { font-size: 1.1rem; }
@@ -498,7 +420,8 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     .leaderboard { max-height: 250px; padding: 8px; }
     .player-card { padding: 6px 10px; }
     .player-card .nombre { font-size: 0.8rem; }
-    .player-card .puntos { font-size: 0.8rem; }
+    .player-card .puntos-total { font-size: 0.8rem; }
+    .player-card .puntos-detalle { font-size: 0.6rem; }
     #zoomBoard .dice-cell { width: 35px; height: 35px; font-size: 1rem; }
     #zoomBoard .dice-cell .dice-value { font-size: 1.2rem; }
 }
@@ -506,9 +429,6 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
 @media (max-width: 480px) {
     .dice-cell { width: 40px; height: 40px; font-size: 1rem; }
     .dice-cell .dice-value { font-size: 1.2rem; }
-    .dice-cell .dice-indice { width: 16px; height: 16px; font-size: 0.5rem; top: -6px; right: -6px; }
-    .dice-cell .dice-orden { width: 16px; height: 16px; font-size: 0.5rem; bottom: -6px; left: -6px; }
-    .dice-cell .contribucion-badge { width: 16px; height: 16px; font-size: 0.4rem; top: -6px; right: -6px; }
     .scoreboard .modal-btn { font-size: 0.65rem; padding: 6px 8px; }
     #zoomBoard .dice-cell { width: 40px; height: 40px; font-size: 1rem; }
     #zoomBoard .dice-cell .dice-value { font-size: 1.2rem; }
@@ -516,7 +436,6 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     .modal-box h2 { font-size: 1.4rem; }
 }
 
-/* Scrollbar personalizada */
 ::-webkit-scrollbar {
     width: 6px;
 }
@@ -535,7 +454,6 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     background: var(--text-muted);
 }
 
-/* Botones deshabilitados */
 .modal-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
