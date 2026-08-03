@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>FigurasDados</title>
-    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="stylesheet" href="./style.css">
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
@@ -13,7 +13,7 @@
     <!-- LOBBY PRINCIPAL -->
     <div id="lobbyModal" class="modal-overlay">
         <div class="modal-box">
-            <h2>Figuras Dados</h2>
+            <h2>FigurasDados</h2>
             <p>Selecciona un modo de juego</p>
             <div class="input-group">
                 <label>Tu Nombre:</label>
@@ -69,7 +69,6 @@
         <div class="modal-box" style="max-width: 500px;">
             <h2 id="zoomJugadorNombre">Jugador</h2>
             <div id="zoomBoard" style="margin: 15px 0;"></div>
-            <!-- Eliminado: zoomInfo y btnCerrarZoom -->
         </div>
     </div>
 
@@ -91,7 +90,6 @@
 
         <div class="side-panel">
             <div class="scoreboard">
-                <!-- Eliminados: PUNTOS: y Figuras: -->
                 <div style="display: flex; gap: 8px; margin-top: 0;">
                     <button class="modal-btn btn-primary" id="btnFiguraSimple" style="flex:1; padding: 8px; font-size: 0.8rem;">
                         Figura Simple
