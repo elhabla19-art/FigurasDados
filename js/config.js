@@ -573,20 +573,50 @@ function manejarAccionRemota(data) {
     }
 }
 
+/**
+ * Manejar mensaje de completado remoto
+ * Cuando otro jugador completa la figura, todos los demás deben marcar su figura como completada
+ */
 function manejarCompletarRemoto(data) {
+    // Ignorar si es nuestro propio mensaje
     if (data.id === config.myId) return;
+    
     var jugadorId = data.jugadorId || data.id;
     
+    console.log('Completado remoto recibido de:', jugadorId);
+    
+    // Actualizar estado del jugador en leaderboard
     leaderboardManager.actualizarEstado(jugadorId, 'completado');
+    
+    // Actualizar zoom
     zoomManager.actualizarJugador(jugadorId, {
         estado: 'completado'
     });
     
+    // Actualizar puntuación si viene en el mensaje
     if (data.puntos !== undefined) {
         leaderboardManager.establecerPuntuacion(jugadorId, data.puntos);
     }
     
+    // CRUCIAL: Marcar la figura como completada en el juego local
+    // Esto permite que los botones se desbloqueen para todos los jugadores
+    var estadoLocal = juegoManager.obtenerEstado();
+    
+    // Solo marcar como completado si hay una figura activa y no está completada localmente
+    if (estadoLocal.figuraActual && !estadoLocal.completado) {
+        console.log('Marcando figura como completada localmente (remota)');
+        juegoManager.marcarCompletadoRemoto();
+        
+        // Actualizar la UI
+        var nuevoEstado = juegoManager.obtenerEstado();
+        renderizarTablero(nuevoEstado);
+        actualizarUI(nuevoEstado);
+    }
+    
+    // Actualizar botones (se desbloquearán porque completado es true)
     actualizarBotonesFigura();
+    
+    console.log('Completado remoto procesado. Botones actualizados.');
 }
 
 function manejarDeshacerRemoto(data) {

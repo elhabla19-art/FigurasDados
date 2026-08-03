@@ -375,6 +375,40 @@ class JuegoManager {
         return true;
     }
 
+    /**
+     * Marcar la figura como completada remotamente (cuando otro jugador completa)
+     * Esto permite que todos los jugadores sepan que la ronda terminó
+     */
+    marcarCompletadoRemoto() {
+        // Si ya está completado localmente, no hacer nada
+        if (this.estado.completado) return true;
+        
+        // Si no hay figura activa, no hacer nada
+        if (!this.estado.figuraActual) return false;
+        
+        // Marcar como completado
+        this.estado.completado = true;
+        
+        // Registrar en deshacer
+        deshacerManager.pushAccion({
+            tipo: 'completar_remoto',
+            jugadorId: this.estado.jugadorId,
+            figuraId: this.estado.figuraActual.id,
+            modo: this.modoFigura,
+            timestamp: Date.now()
+        });
+        
+        // Actualizar zoom
+        zoomManager.actualizarJugador(this.estado.jugadorId, {
+            estado: 'completado'
+        });
+        
+        // Notificar a todos los observers (UI se actualizará)
+        this.notificar();
+        
+        return true;
+    }
+
     // Deshacer la última acción (método legacy)
     deshacer() {
         if (!this.estado.enJuego || this.estado.completado) return false;
