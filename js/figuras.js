@@ -10,7 +10,9 @@ var VALORES_DADOS = [1, 2, 3, 4, 5, 6];
 var NUMERO_MINIMO_DADOS = 3;
 var NUMERO_MAXIMO_DADOS = 10;
 
-// Tipos de formas disponibles
+// ===== FIGURAS SIMPLES (3-10 DADOS) =====
+
+// Tipos de formas disponibles para modo simple
 var FORMAS_DISPONIBLES = [
     'linea',
     'linea_larga',
@@ -30,7 +32,7 @@ var FORMAS_DISPONIBLES = [
     'estrella'
 ];
 
-// Definiciones de formas
+// Definiciones de formas simples
 var FORMAS = {
     linea: [
         { x: 0, y: 0 },
@@ -160,14 +162,328 @@ var FORMAS = {
     ]
 };
 
-// Funciones principales
+// ===== FIGURAS GRANDES PARA MODO GRUPAL (20 DADOS CADA UNA - MATRIZ 6x5) =====
 
-function generarFigura() {
-    var formaNombre = FORMAS_DISPONIBLES[Math.floor(Math.random() * FORMAS_DISPONIBLES.length)];
-    var formaBase = FORMAS[formaNombre];
+// Formas grandes disponibles
+var FORMAS_GRANDES = [
+    'numeral',
+    'piramide',
+    'puente',
+    'torre',
+    'cangrejo',
+    'vista',
+    'punto',
+    'lupa',
+    'espiral',
+    'nave',
+    'ventana',
+    'perro',
+    'cactus',
+    'lagartija',
+    'escalera',
+    'escalera_invertida',
+    'cabra',
+    'flecha_arriba',
+    'flecha_abajo',
+    'persona'
+];
+
+// Definiciones de formas grandes - Cada una es una matriz de 6 filas x 5 columnas
+// Los 1 representan celdas ocupadas, los 0 son espacios vacíos
+// La coordenada (0,0) es la esquina superior izquierda
+var FORMAS_GRANDES_DEF = {
+    // 0	1	0	1	0
+    // 1	1	1	1	1
+    // 0	1	0	1	0
+    // 0	1	0	1	0
+    // 1	1	1	1	1
+    // 0	1	0	1	0
+    numeral: [
+        { x: 0, y: 0 }, { x: 2, y: 0 }, { x: 4, y: 0 },
+        { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 }, { x: 4, y: 1 },
+        { x: 2, y: 2 }, { x: 4, y: 2 },
+        { x: 2, y: 3 }, { x: 4, y: 3 },
+        { x: 0, y: 4 }, { x: 1, y: 4 }, { x: 2, y: 4 }, { x: 3, y: 4 }, { x: 4, y: 4 },
+        { x: 2, y: 5 }, { x: 4, y: 5 }
+    ],
+    // 0	0	0	0	0
+    // 0	0	1	0	0
+    // 0	1	1	1	0
+    // 0	1	1	1	0
+    // 1	1	1	1	1
+    // 1	1	1	1	1
+    piramide: [
+        { x: 2, y: 1 },
+        { x: 1, y: 2 }, { x: 2, y: 2 }, { x: 3, y: 2 },
+        { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 },
+        { x: 0, y: 4 }, { x: 1, y: 4 }, { x: 2, y: 4 }, { x: 3, y: 4 }, { x: 4, y: 4 },
+        { x: 0, y: 5 }, { x: 1, y: 5 }, { x: 2, y: 5 }, { x: 3, y: 5 }, { x: 4, y: 5 }
+    ],
+    // 0	0	0	0	0
+    // 0	1	0	1	0
+    // 0	1	1	1	0
+    // 0	1	0	1	0
+    // 1	1	1	1	1
+    // 0	1	0	1	0
+    puente: [
+        { x: 1, y: 1 }, { x: 3, y: 1 },
+        { x: 1, y: 2 }, { x: 2, y: 2 }, { x: 3, y: 2 },
+        { x: 1, y: 3 }, { x: 3, y: 3 },
+        { x: 0, y: 4 }, { x: 1, y: 4 }, { x: 2, y: 4 }, { x: 3, y: 4 }, { x: 4, y: 4 },
+        { x: 1, y: 5 }, { x: 3, y: 5 }
+    ],
+    // 0	1	0	1	0
+    // 1	1	1	1	1
+    // 0	1	0	1	0
+    // 0	1	1	1	0
+    // 0	1	0	1	0
+    // 0	1	1	1	0
+    torre: [
+        { x: 1, y: 0 }, { x: 3, y: 0 },
+        { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 }, { x: 4, y: 1 },
+        { x: 1, y: 2 }, { x: 3, y: 2 },
+        { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 },
+        { x: 1, y: 4 }, { x: 3, y: 4 },
+        { x: 1, y: 5 }, { x: 2, y: 5 }, { x: 3, y: 5 }
+    ],
+    // 0	0	0	0	0
+    // 1	0	0	0	1
+    // 1	1	1	1	1
+    // 0	1	1	1	0
+    // 1	1	1	1	1
+    // 1	0	0	0	1
+    cangrejo: [
+        { x: 0, y: 1 }, { x: 4, y: 1 },
+        { x: 0, y: 2 }, { x: 1, y: 2 }, { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 4, y: 2 },
+        { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 },
+        { x: 0, y: 4 }, { x: 1, y: 4 }, { x: 2, y: 4 }, { x: 3, y: 4 }, { x: 4, y: 4 },
+        { x: 0, y: 5 }, { x: 4, y: 5 }
+    ],
+    // 1	1	1	1	1
+    // 1	0	1	0	1
+    // 1	0	1	0	1
+    // 1	0	1	0	1
+    // 1	0	1	0	1
+    // 1	1	1	1	1
+    vista: [
+        { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }, { x: 4, y: 0 },
+        { x: 0, y: 1 }, { x: 2, y: 1 }, { x: 4, y: 1 },
+        { x: 0, y: 2 }, { x: 2, y: 2 }, { x: 4, y: 2 },
+        { x: 0, y: 3 }, { x: 2, y: 3 }, { x: 4, y: 3 },
+        { x: 0, y: 4 }, { x: 2, y: 4 }, { x: 4, y: 4 },
+        { x: 0, y: 5 }, { x: 1, y: 5 }, { x: 2, y: 5 }, { x: 3, y: 5 }, { x: 4, y: 5 }
+    ],
+    // 0	0	0	0	0
+    // 0	0	1	0	0
+    // 0	1	1	1	0
+    // 1	1	1	1	1
+    // 0	1	1	1	0
+    // 0	0	1	0	0
+    punto: [
+        { x: 2, y: 1 },
+        { x: 1, y: 2 }, { x: 2, y: 2 }, { x: 3, y: 2 },
+        { x: 0, y: 3 }, { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 }, { x: 4, y: 3 },
+        { x: 1, y: 4 }, { x: 2, y: 4 }, { x: 3, y: 4 },
+        { x: 2, y: 5 }
+    ],
+    // 1	1	1	1	1
+    // 1	0	0	0	1
+    // 1	0	0	0	1
+    // 1	1	1	1	1
+    // 0	0	1	0	0
+    // 1	1	1	1	1
+    lupa: [
+        { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }, { x: 4, y: 0 },
+        { x: 0, y: 1 }, { x: 4, y: 1 },
+        { x: 0, y: 2 }, { x: 4, y: 2 },
+        { x: 0, y: 3 }, { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 }, { x: 4, y: 3 },
+        { x: 2, y: 4 },
+        { x: 0, y: 5 }, { x: 1, y: 5 }, { x: 2, y: 5 }, { x: 3, y: 5 }, { x: 4, y: 5 }
+    ],
+    // 1	1	1	1	1
+    // 0	0	0	0	1
+    // 1	1	1	0	1
+    // 1	0	1	0	1
+    // 1	0	0	0	1
+    // 1	1	1	1	1
+    espiral: [
+        { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }, { x: 4, y: 0 },
+        { x: 4, y: 1 },
+        { x: 0, y: 2 }, { x: 1, y: 2 }, { x: 2, y: 2 }, { x: 4, y: 2 },
+        { x: 0, y: 3 }, { x: 2, y: 3 }, { x: 4, y: 3 },
+        { x: 0, y: 4 }, { x: 4, y: 4 },
+        { x: 0, y: 5 }, { x: 1, y: 5 }, { x: 2, y: 5 }, { x: 3, y: 5 }, { x: 4, y: 5 }
+    ],
+    // 0	0	1	0	0
+    // 0	0	1	0	0
+    // 0	1	1	1	0
+    // 0	1	1	1	0
+    // 1	1	1	1	1
+    // 0	1	1	1	0
+    nave: [
+        { x: 2, y: 0 },
+        { x: 2, y: 1 },
+        { x: 1, y: 2 }, { x: 2, y: 2 }, { x: 3, y: 2 },
+        { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 },
+        { x: 0, y: 4 }, { x: 1, y: 4 }, { x: 2, y: 4 }, { x: 3, y: 4 }, { x: 4, y: 4 },
+        { x: 1, y: 5 }, { x: 2, y: 5 }, { x: 3, y: 5 }
+    ],
+    // 1	1	1	1	1
+    // 1	0	1	0	1
+    // 1	0	1	1	1
+    // 1	1	1	0	1
+    // 1	0	1	0	1
+    // 1	1	1	1	1
+    ventana: [
+        { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }, { x: 4, y: 0 },
+        { x: 0, y: 1 }, { x: 2, y: 1 }, { x: 4, y: 1 },
+        { x: 0, y: 2 }, { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 4, y: 2 },
+        { x: 0, y: 3 }, { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 4, y: 3 },
+        { x: 0, y: 4 }, { x: 2, y: 4 }, { x: 4, y: 4 },
+        { x: 0, y: 5 }, { x: 1, y: 5 }, { x: 2, y: 5 }, { x: 3, y: 5 }, { x: 4, y: 5 }
+    ],
+    // 0	0	0	0	0
+    // 0	1	0	0	0
+    // 1	1	0	0	0
+    // 0	1	1	1	1
+    // 0	1	0	0	1
+    // 0	1	0	0	1
+    perro: [
+        { x: 1, y: 1 },
+        { x: 0, y: 2 }, { x: 1, y: 2 },
+        { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 }, { x: 4, y: 3 },
+        { x: 1, y: 4 }, { x: 4, y: 4 },
+        { x: 1, y: 5 }, { x: 4, y: 5 }
+    ],
+    // 1	0	1	0	1
+    // 1	0	1	0	1
+    // 1	1	1	1	1
+    // 0	0	1	0	0
+    // 0	0	1	0	0
+    // 0	0	1	0	0
+    cactus: [
+        { x: 0, y: 0 }, { x: 2, y: 0 }, { x: 4, y: 0 },
+        { x: 0, y: 1 }, { x: 2, y: 1 }, { x: 4, y: 1 },
+        { x: 0, y: 2 }, { x: 1, y: 2 }, { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 4, y: 2 },
+        { x: 2, y: 3 },
+        { x: 2, y: 4 },
+        { x: 2, y: 5 }
+    ],
+    // 1	0	1	0	1
+    // 1	1	1	1	1
+    // 0	0	1	0	0
+    // 0	0	1	0	0
+    // 1	1	1	1	1
+    // 1	0	1	0	1
+    lagartija: [
+        { x: 0, y: 0 }, { x: 2, y: 0 }, { x: 4, y: 0 },
+        { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 }, { x: 4, y: 1 },
+        { x: 2, y: 2 },
+        { x: 2, y: 3 },
+        { x: 0, y: 4 }, { x: 1, y: 4 }, { x: 2, y: 4 }, { x: 3, y: 4 }, { x: 4, y: 4 },
+        { x: 0, y: 5 }, { x: 2, y: 5 }, { x: 4, y: 5 }
+    ],
+    // 0	0	0	0	0
+    // 0	0	0	0	1
+    // 0	0	0	1	1
+    // 0	0	1	1	1
+    // 0	1	1	1	1
+    // 1	1	1	1	1
+    escalera: [
+        { x: 4, y: 1 },
+        { x: 3, y: 2 }, { x: 4, y: 2 },
+        { x: 2, y: 3 }, { x: 3, y: 3 }, { x: 4, y: 3 },
+        { x: 1, y: 4 }, { x: 2, y: 4 }, { x: 3, y: 4 }, { x: 4, y: 4 },
+        { x: 0, y: 5 }, { x: 1, y: 5 }, { x: 2, y: 5 }, { x: 3, y: 5 }, { x: 4, y: 5 }
+    ],
+    // 1	1	1	1	1
+    // 1	1	1	1	0
+    // 1	1	1	0	0
+    // 1	1	0	0	0
+    // 1	0	0	0	0
+    // 0	0	0	0	0
+    escalera_invertida: [
+        { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }, { x: 4, y: 0 },
+        { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 },
+        { x: 0, y: 2 }, { x: 1, y: 2 }, { x: 2, y: 2 },
+        { x: 0, y: 3 }, { x: 1, y: 3 },
+        { x: 0, y: 4 }
+    ],
+    // 0	1	0	1	0
+    // 0	1	0	1	0
+    // 1	1	1	1	1
+    // 1	1	1	1	1
+    // 0	1	1	1	0
+    // 0	0	1	0	0
+    cabra: [
+        { x: 1, y: 0 }, { x: 3, y: 0 },
+        { x: 1, y: 1 }, { x: 3, y: 1 },
+        { x: 0, y: 2 }, { x: 1, y: 2 }, { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 4, y: 2 },
+        { x: 0, y: 3 }, { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 }, { x: 4, y: 3 },
+        { x: 1, y: 4 }, { x: 2, y: 4 }, { x: 3, y: 4 },
+        { x: 2, y: 5 }
+    ],
+    // 0	0	1	0	0
+    // 0	1	1	1	0
+    // 1	1	1	1	1
+    // 1	0	1	0	1
+    // 0	0	1	0	0
+    // 0	0	1	0	0
+    flecha_arriba: [
+        { x: 2, y: 0 },
+        { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 },
+        { x: 0, y: 2 }, { x: 1, y: 2 }, { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 4, y: 2 },
+        { x: 0, y: 3 }, { x: 2, y: 3 }, { x: 4, y: 3 },
+        { x: 2, y: 4 },
+        { x: 2, y: 5 }
+    ],
+    // 0	0	1	0	0
+    // 0	0	1	0	0
+    // 1	0	1	0	1
+    // 1	1	1	1	1
+    // 0	1	1	1	0
+    // 0	0	1	0	0
+    flecha_abajo: [
+        { x: 2, y: 0 },
+        { x: 2, y: 1 },
+        { x: 0, y: 2 }, { x: 2, y: 2 }, { x: 4, y: 2 },
+        { x: 0, y: 3 }, { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 }, { x: 4, y: 3 },
+        { x: 1, y: 4 }, { x: 2, y: 4 }, { x: 3, y: 4 },
+        { x: 2, y: 5 }
+    ],
+    // 0	0	1	0	1
+    // 1	1	1	1	1
+    // 1	0	1	0	0
+    // 0	0	1	0	0
+    // 0	1	1	1	0
+    // 1	1	0	1	1
+    persona: [
+        { x: 2, y: 0 }, { x: 4, y: 0 },
+        { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 }, { x: 4, y: 1 },
+        { x: 0, y: 2 }, { x: 2, y: 2 },
+        { x: 2, y: 3 },
+        { x: 1, y: 4 }, { x: 2, y: 4 }, { x: 3, y: 4 },
+        { x: 0, y: 5 }, { x: 1, y: 5 }, { x: 3, y: 5 }, { x: 4, y: 5 }
+    ]
+};
+
+// ===== FUNCIONES PRINCIPALES =====
+
+function generarFigura(modo) {
+    var formaNombre, formaBase;
+    
+    if (modo === 'grupal') {
+        // Usar figuras grandes (20 dados cada una - matriz 6x5)
+        formaNombre = FORMAS_GRANDES[Math.floor(Math.random() * FORMAS_GRANDES.length)];
+        formaBase = FORMAS_GRANDES_DEF[formaNombre];
+    } else {
+        // Usar figuras normales (3-10 dados)
+        formaNombre = FORMAS_DISPONIBLES[Math.floor(Math.random() * FORMAS_DISPONIBLES.length)];
+        formaBase = FORMAS[formaNombre];
+    }
     
     if (!formaBase) {
-        return generarFiguraPorDefecto();
+        return generarFiguraPorDefecto(modo);
     }
     
     var celdas = formaBase.map(function(pos) {
@@ -192,18 +508,28 @@ function generarFigura() {
     };
 }
 
-function generarFiguraPorDefecto() {
-    var celdas = [
-        { x: 0, y: 0, valor: 6 },
-        { x: -1, y: 0, valor: 1 },
-        { x: 1, y: 0, valor: 1 },
-        { x: 0, y: -1, valor: 1 },
-        { x: 0, y: 1, valor: 1 }
-    ];
+function generarFiguraPorDefecto(modo) {
+    var celdas;
+    if (modo === 'grupal') {
+        celdas = [
+            { x: 0, y: 0, valor: 6 }, { x: 1, y: 0, valor: 1 }, { x: 2, y: 0, valor: 1 },
+            { x: 0, y: 1, valor: 1 }, { x: 1, y: 1, valor: 1 }, { x: 2, y: 1, valor: 1 },
+            { x: 0, y: 2, valor: 1 }, { x: 1, y: 2, valor: 1 }, { x: 2, y: 2, valor: 1 },
+            { x: 3, y: 0, valor: 1 }, { x: 3, y: 1, valor: 1 }, { x: 3, y: 2, valor: 1 }
+        ];
+    } else {
+        celdas = [
+            { x: 0, y: 0, valor: 6 },
+            { x: -1, y: 0, valor: 1 },
+            { x: 1, y: 0, valor: 1 },
+            { x: 0, y: -1, valor: 1 },
+            { x: 0, y: 1, valor: 1 }
+        ];
+    }
     
     return {
         id: generarIdFigura(),
-        forma: 'cruz',
+        forma: modo === 'grupal' ? 'rectangulo' : 'cruz',
         celdas: celdas,
         inicio: { x: 0, y: 0 },
         totalCeldas: celdas.length,
@@ -327,6 +653,14 @@ function obtenerFormaPorNombre(nombre) {
     return FORMAS[nombre] || null;
 }
 
+function obtenerFormasGrandesDisponibles() {
+    return FORMAS_GRANDES.slice();
+}
+
+function obtenerFormaGrandePorNombre(nombre) {
+    return FORMAS_GRANDES_DEF[nombre] || null;
+}
+
 // Exportar para usar en otros modulos
 export {
     generarFigura,
@@ -337,6 +671,8 @@ export {
     normalizarFigura,
     obtenerFormasDisponibles,
     obtenerFormaPorNombre,
+    obtenerFormasGrandesDisponibles,
+    obtenerFormaGrandePorNombre,
     VALORES_DADOS,
     NUMERO_MINIMO_DADOS,
     NUMERO_MAXIMO_DADOS

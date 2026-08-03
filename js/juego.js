@@ -50,7 +50,7 @@ class JuegoManager {
     // Iniciar ronda normal (individual)
     iniciarRonda(jugadorId) {
         this.estado.jugadorId = jugadorId;
-        this.estado.figuraActual = generarFigura();
+        this.estado.figuraActual = generarFigura('simple');  // <-- PASAR 'simple'
         this.estado.celdasColocadas = [];
         this.estado.completado = false;
         this.estado.ronda += 1;
@@ -86,7 +86,7 @@ class JuegoManager {
     iniciarModoSimple(jugadorId, figura) {
         this.modoFigura = 'simple';
         this.estado.jugadorId = jugadorId;
-        this.estado.figuraActual = figura || generarFigura();
+        this.estado.figuraActual = figura || generarFigura('simple');  // <-- PASAR 'simple'
         this.estado.celdasColocadas = [];
         this.estado.completado = false;
         this.estado.ronda += 1;
@@ -122,7 +122,7 @@ class JuegoManager {
     iniciarModoGrupal(jugadorId, figura) {
         this.modoFigura = 'grupal';
         this.estado.jugadorId = jugadorId;
-        this.estado.figuraActual = figura || generarFigura();
+        this.estado.figuraActual = figura || generarFigura('grupal');  // <-- PASAR 'grupal'
         this.estado.celdasColocadas = [];
         this.estado.completado = false;
         this.estado.ronda += 1;
