@@ -60,8 +60,6 @@ class JuegoManager {
             figuraId: this.estado.figuraActual.id
         });
         
-        var progreso = obtenerProgreso(this.estado.figuraActual, this.estado.celdasColocadas);
-        
         if (figuraCompletada(this.estado.figuraActual, this.estado.celdasColocadas)) {
             this.completarFigura();
         }
@@ -76,9 +74,66 @@ class JuegoManager {
         return true;
     }
 
+    // NUEVA FUNCION: Deshacer una celda especifica
+    deshacerCelda(x, y) {
+        if (!this.estado.enJuego || this.estado.completado) return false;
+        
+        // Buscar la celda en las colocadas
+        var index = -1;
+        for (var i = 0; i < this.estado.celdasColocadas.length; i++) {
+            if (this.estado.celdasColocadas[i].x === x && this.estado.celdasColocadas[i].y === y) {
+                index = i;
+                break;
+            }
+        }
+        
+        if (index === -1) return false;
+        
+        // Solo se puede deshacer la ULTIMA celda colocada
+        if (index !== this.estado.celdasColocadas.length - 1) {
+            return false;
+        }
+        
+        // Remover la celda
+        var celdaRemovida = this.estado.celdasColocadas.pop();
+        
+        // Eliminar del historial de deshacer
+        var acciones = deshacerManager.obtenerHistorialJugador(this.estado.jugadorId);
+        for (var j = acciones.length - 1; j >= 0; j--) {
+            if (acciones[j].tipo === 'colocar' && 
+                acciones[j].celda.x === x && 
+                acciones[j].celda.y === y) {
+                // Remover esta accion del historial
+                var historialCompleto = deshacerManager.obtenerHistorial();
+                for (var k = 0; k < historialCompleto.length; k++) {
+                    if (historialCompleto[k].id === acciones[j].id) {
+                        historialCompleto.splice(k, 1);
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+        
+        // Actualizar leaderboard y zoom
+        leaderboardManager.actualizarCeldas(this.estado.jugadorId, this.estado.celdasColocadas);
+        zoomManager.actualizarJugador(this.estado.jugadorId, {
+            celdasColocadas: this.estado.celdasColocadas
+        });
+        
+        this.notificar();
+        return true;
+    }
+
     obtenerValorCelda(x, y) {
         if (!this.estado.figuraActual) return null;
-        var celda = this.estado.figuraActual.celdas.find(function(c) { return c.x === x && c.y === y; });
+        var celda = null;
+        for (var i = 0; i < this.estado.figuraActual.celdas.length; i++) {
+            if (this.estado.figuraActual.celdas[i].x === x && this.estado.figuraActual.celdas[i].y === y) {
+                celda = this.estado.figuraActual.celdas[i];
+                break;
+            }
+        }
         return celda ? celda.valor : null;
     }
 
@@ -111,9 +166,14 @@ class JuegoManager {
         if (!accion) return false;
         
         if (accion.tipo === 'colocar') {
-            var index = this.estado.celdasColocadas.findIndex(
-                function(c) { return c.x === accion.celda.x && c.y === accion.celda.y; }
-            );
+            var index = -1;
+            for (var i = 0; i < this.estado.celdasColocadas.length; i++) {
+                if (this.estado.celdasColocadas[i].x === accion.celda.x && 
+                    this.estado.celdasColocadas[i].y === accion.celda.y) {
+                    index = i;
+                    break;
+                }
+            }
             if (index !== -1) {
                 this.estado.celdasColocadas.splice(index, 1);
             }
@@ -155,11 +215,21 @@ class JuegoManager {
 
     esCeldaDisponible(x, y) {
         var disponibles = this.obtenerCeldasDisponibles();
-        return disponibles.some(function(c) { return c.x === x && c.y === y; });
+        for (var i = 0; i < disponibles.length; i++) {
+            if (disponibles[i].x === x && disponibles[i].y === y) {
+                return true;
+            }
+        }
+        return false;
     }
 
     esCeldaColocada(x, y) {
-        return this.estado.celdasColocadas.some(function(c) { return c.x === x && c.y === y; });
+        for (var i = 0; i < this.estado.celdasColocadas.length; i++) {
+            if (this.estado.celdasColocadas[i].x === x && this.estado.celdasColocadas[i].y === y) {
+                return true;
+            }
+        }
+        return false;
     }
 
     obtenerEstado() {
