@@ -1,6 +1,6 @@
-// zoom.js - Eliminar progreso y botón cerrar
+// zoom.js
 
-import { clonarObjeto, calcularPorcentaje } from './utils.js';
+import { clonarObjeto, calcularPorcentaje, renderizarDado } from './utils.js';
 import { leaderboardManager } from './leaderboard.js';
 
 class ZoomManager {
@@ -154,7 +154,6 @@ class ZoomManager {
 
 export const zoomManager = new ZoomManager();
 
-// ===== UI FUNCTIONS =====
 let zoomModal, zoomBoard, zoomJugadorNombre;
 let zoomInicializado = false;
 let zoomJugadorActual = null;
@@ -207,7 +206,6 @@ export function actualizarZoomDirecto(jugador) {
     
     zoomJugadorNombre.textContent = jugador.nombre;
     zoomBoard.innerHTML = renderizarZoomTablero(jugador);
-    // Eliminado: zoomInfo
 }
 
 export function renderizarZoomTablero(jugador) {
@@ -249,9 +247,11 @@ export function renderizarZoomTablero(jugador) {
             else if (colocada) clases += ' colocado';
             else clases += ' disponible';
             
+            const dadoHtml = renderizarDado(celda.valor);
+            
             html += `
                 <div class="${clases}">
-                    <span class="dice-value">${celda.valor}</span>
+                    ${dadoHtml}
                 </div>
             `;
         }

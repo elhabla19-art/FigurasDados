@@ -1,20 +1,18 @@
-// ui.js - Cambios para eliminar puntos/figuras y modificar leaderboard
+// ui.js
 
 import { juegoManager } from './juego.js';
 import { leaderboardManager } from './leaderboard.js';
 import { mostrarZoom, actualizarZoomDirecto, renderizarZoomTablero } from './zoom.js';
 import { handleCellClick } from './config.js';
+import { renderizarDado } from './utils.js';
 
-let gameBoard, playersList, puntosTotal, figurasCompletadas;
+let gameBoard, playersList;
 let clickHandlerAttached = false;
 let ultimoEstadoRenderizado = null;
 
 export function initUI() {
     gameBoard = document.getElementById('game-board');
     playersList = document.getElementById('playersList');
-    // Ya no necesitamos estas referencias
-    // puntosTotal = document.getElementById('puntos-total');
-    // figurasCompletadas = document.getElementById('figuras-completadas');
     
     if (!clickHandlerAttached && gameBoard) {
         gameBoard.addEventListener('click', handleBoardClick);
@@ -42,7 +40,6 @@ function handleBoardClick(e) {
     handleCellClick(x, y, colocada);
 }
 
-// ===== MODALES =====
 export function mostrarModalLobby() {
     document.getElementById('lobbyModal').style.display = 'flex';
     document.getElementById('joinModal').style.display = 'none';
@@ -60,7 +57,6 @@ export function ocultarLoading() {
     document.getElementById('loadingModal').style.display = 'none';
 }
 
-// ===== RENDERIZADO =====
 export function renderizarTablero(estado) {
     const figuraActual = estado.figuraActual;
     const celdasColocadas = estado.celdasColocadas;
@@ -98,30 +94,21 @@ export function renderizarTablero(estado) {
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
     const ancho = maxX - minX + 1;
-    const alto = maxY - minY + 1;
     
     const colocadasSet = new Set(celdasColocadas.map(c => `${c.x},${c.y}`));
     
     const totalCeldas = celdas.length;
     let cellSize = '50px';
-    let fontSize = '1.4rem';
-    let valueFontSize = '1.6rem';
     let gap = '8px';
     
     if (totalCeldas > 25) {
         cellSize = '35px';
-        fontSize = '0.9rem';
-        valueFontSize = '1.1rem';
         gap = '5px';
     } else if (totalCeldas > 15) {
         cellSize = '40px';
-        fontSize = '1rem';
-        valueFontSize = '1.3rem';
         gap = '6px';
     } else if (totalCeldas > 8) {
         cellSize = '45px';
-        fontSize = '1.2rem';
-        valueFontSize = '1.4rem';
         gap = '7px';
     }
     
@@ -146,15 +133,15 @@ export function renderizarTablero(estado) {
                 clase += ' colocado';
             }
             
+            const dadoHtml = renderizarDado(celda.valor);
+            
             html += `
                 <div class="${clase}" 
                      data-x="${x}" data-y="${y}" 
                      data-colocada="${colocada}" 
                      data-esfigura="true"
-                     style="width: ${cellSize}; height: ${cellSize}; font-size: ${fontSize};">
-                    <span class="dice-value" style="font-size: ${valueFontSize};">
-                        ${celda.valor}
-                    </span>
+                     style="width: ${cellSize}; height: ${cellSize};">
+                    ${dadoHtml}
                 </div>
             `;
         }
@@ -165,7 +152,6 @@ export function renderizarTablero(estado) {
 }
 
 export function actualizarUI(estado) {
-    // Ya no actualizamos puntos y figuras en la UI
     // Los puntajes ahora solo se ven en el leaderboard
 }
 
@@ -179,12 +165,10 @@ export function renderizarLeaderboard() {
     }
     
     let html = '';
-    let miPosicion = -1;
     
     for (let i = 0; i < ranking.length; i++) {
         const jugador = ranking[i];
         const esMi = jugador.id === myId;
-        if (esMi) miPosicion = i;
         
         const posicion = i + 1;
         const medalla = posicion === 1 ? '🥇' : posicion === 2 ? '🥈' : posicion === 3 ? '🥉' : `#${posicion}`;

@@ -225,7 +225,7 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     font-size: 1.4rem;
     font-weight: bold;
     user-select: none;
-    transition: border-color 0.2s, background 0.2s;
+    transition: transform 0.2s ease;
     cursor: pointer;
 }
 
@@ -236,12 +236,21 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     pointer-events: none;
 }
 
+/* Solo las celdas disponibles (sin marcar) se elevan al hacer hover */
+.dice-cell:not(.colocado):not(.completado):not(.vacio):hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
 .dice-cell.colocado {
     background: var(--bg-box-marked);
     border-color: var(--color-success);
 }
-.dice-cell.colocado:hover { border-color: var(--color-danger); }
-.dice-cell.colocado .dice-value { color: var(--text-main); }
+
+.dice-cell.colocado:hover {
+    transform: none;
+    box-shadow: none;
+}
 
 .dice-cell.completado {
     background: var(--color-success);
@@ -250,9 +259,70 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     opacity: 0.6;
     pointer-events: none;
 }
-.dice-cell.completado .dice-value { color: white; }
 
-.dice-cell .dice-value { font-size: 1.6rem; font-weight: 900; }
+.dice-cell.completado .dice-value {
+    color: white;
+}
+
+.dice-cell .dice-value {
+    font-size: 1.6rem;
+    font-weight: 900;
+}
+
+/* Estilos para dados visuales con puntos */
+.dado-visual {
+    background: #2d2d2d;
+    border-radius: 8px;
+    padding: 2px;
+    aspect-ratio: 1 / 1;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+}
+
+.dado-visual > div > div {
+    background: white !important;
+    border-radius: 50%;
+    aspect-ratio: 1 / 1;
+}
+
+.dice-cell.colocado .dado-visual {
+    background: #1a1a1a;
+}
+
+.dice-cell.colocado .dado-visual > div > div {
+    background: #4caf50 !important;
+}
+
+.dice-cell.completado .dado-visual {
+    background: #43a047;
+}
+
+.dice-cell.completado .dado-visual > div > div {
+    background: #ffffff !important;
+}
+
+#zoomBoard .dado-visual {
+    background: #2d2d2d;
+    border-radius: 8px;
+    padding: 2px;
+}
+
+#zoomBoard .dice-cell.colocado .dado-visual {
+    background: #1a1a1a;
+}
+
+#zoomBoard .dice-cell.colocado .dado-visual > div > div {
+    background: #4caf50 !important;
+}
+
+#zoomBoard .dice-cell.completado .dado-visual {
+    background: #43a047;
+}
+
+#zoomBoard .dice-cell.completado .dado-visual > div > div {
+    background: #ffffff !important;
+}
 
 /* SIDE PANEL */
 .side-panel { width: 100%; display: flex; flex-direction: column; gap: 10px; }
