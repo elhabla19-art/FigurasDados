@@ -36,7 +36,7 @@
             <p>Pide el codigo al creador de la sala</p>
             <div class="input-group">
                 <label>Codigo de la Sala (4 letras/numeros):</label>
-                <input type="text" id="roomCodeInput" placeholder="ABCD" maxlength="4" style="text-transform: uppercase;">
+                <input type="text" id="roomCodeInput" placeholder="ABCD" maxlength="4" style="text-transform: uppercase;" autocomplete="off">
             </div>
             <div class="modal-buttons row-btns">
                 <button class="modal-btn btn-outline" id="btnVolver">Volver</button>
@@ -69,8 +69,7 @@
         <div class="modal-box" style="max-width: 500px;">
             <h2 id="zoomJugadorNombre">Jugador</h2>
             <div id="zoomBoard" style="margin: 15px 0;"></div>
-            <div id="zoomInfo" style="color: var(--text-muted); font-size: 0.9rem;"></div>
-            <button class="modal-btn btn-outline" id="btnCerrarZoom" style="margin-top: 15px;">Cerrar</button>
+            <!-- Eliminado: zoomInfo y btnCerrarZoom -->
         </div>
     </div>
 
@@ -92,15 +91,8 @@
 
         <div class="side-panel">
             <div class="scoreboard">
-                <div class="puntuacion-section">
-                    <div class="puntos-total">
-                        PUNTOS: <span id="puntos-total">0</span>
-                    </div>
-                    <div class="figuras-completadas">
-                        Figuras: <span id="figuras-completadas">0</span>
-                    </div>
-                </div>
-                <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <!-- Eliminados: PUNTOS: y Figuras: -->
+                <div style="display: flex; gap: 8px; margin-top: 0;">
                     <button class="modal-btn btn-primary" id="btnFiguraSimple" style="flex:1; padding: 8px; font-size: 0.8rem;">
                         Figura Simple
                     </button>

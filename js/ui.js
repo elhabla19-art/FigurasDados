@@ -1,3 +1,5 @@
+// ui.js - Cambios para eliminar puntos/figuras y modificar leaderboard
+
 import { juegoManager } from './juego.js';
 import { leaderboardManager } from './leaderboard.js';
 import { mostrarZoom, actualizarZoomDirecto, renderizarZoomTablero } from './zoom.js';
@@ -10,8 +12,9 @@ let ultimoEstadoRenderizado = null;
 export function initUI() {
     gameBoard = document.getElementById('game-board');
     playersList = document.getElementById('playersList');
-    puntosTotal = document.getElementById('puntos-total');
-    figurasCompletadas = document.getElementById('figuras-completadas');
+    // Ya no necesitamos estas referencias
+    // puntosTotal = document.getElementById('puntos-total');
+    // figurasCompletadas = document.getElementById('figuras-completadas');
     
     if (!clickHandlerAttached && gameBoard) {
         gameBoard.addEventListener('click', handleBoardClick);
@@ -34,7 +37,6 @@ function handleBoardClick(e) {
     const colocada = cell.dataset.colocada === 'true';
     const esDeFigura = cell.dataset.esfigura === 'true';
     
-    // Si no es de la figura o está completado, ignorar
     if (!esDeFigura) return;
     
     handleCellClick(x, y, colocada);
@@ -75,7 +77,6 @@ export function renderizarTablero(estado) {
         return;
     }
     
-    // Crear un hash del estado actual para evitar renders innecesarios
     const hash = JSON.stringify({
         figuraId: figuraActual.id,
         celdasColocadas: celdasColocadas.map(c => `${c.x},${c.y}`).sort().join('|'),
@@ -84,7 +85,6 @@ export function renderizarTablero(estado) {
         totalCeldas: figuraActual.celdas.length
     });
     
-    // Si el estado no cambió, no renderizar
     if (ultimoEstadoRenderizado === hash) {
         return;
     }
@@ -102,7 +102,6 @@ export function renderizarTablero(estado) {
     
     const colocadasSet = new Set(celdasColocadas.map(c => `${c.x},${c.y}`));
     
-    // Determinar el tamaño de celda basado en la cantidad de celdas
     const totalCeldas = celdas.length;
     let cellSize = '50px';
     let fontSize = '1.4rem';
@@ -166,11 +165,8 @@ export function renderizarTablero(estado) {
 }
 
 export function actualizarUI(estado) {
-    const jugador = leaderboardManager.obtenerJugador(estado.jugadorId);
-    if (jugador) {
-        puntosTotal.textContent = jugador.puntos;
-        figurasCompletadas.textContent = jugador.figurasCompletadas;
-    }
+    // Ya no actualizamos puntos y figuras en la UI
+    // Los puntajes ahora solo se ven en el leaderboard
 }
 
 export function renderizarLeaderboard() {
@@ -190,9 +186,6 @@ export function renderizarLeaderboard() {
         const esMi = jugador.id === myId;
         if (esMi) miPosicion = i;
         
-        const estado = jugador.estado || 'jugando';
-        const estadoText = estado === 'completado' ? '✅ Completado' : '🎯 Jugando';
-        const estadoClass = estado === 'completado' ? 'completado' : '';
         const posicion = i + 1;
         const medalla = posicion === 1 ? '🥇' : posicion === 2 ? '🥈' : posicion === 3 ? '🥉' : `#${posicion}`;
         
@@ -201,13 +194,12 @@ export function renderizarLeaderboard() {
                 <div class="player-info">
                     <span class="posicion">${medalla}</span>
                     <span class="nombre">${jugador.nombre}${esMi ? ' (Tu)' : ''}</span>
-                    <span class="estado ${estadoClass}">${estadoText}</span>
                 </div>
                 <div class="player-puntos">
-                    <span class="puntos-total">${jugador.puntos}</span>
+                    <span class="puntos-total" style="color: #ffffff;">${jugador.puntos}</span>
                     <div class="puntos-detalle">
-                        <span class="puntos-simples">S:${jugador.puntosSimples}</span>
-                        <span class="puntos-grupales">G:${jugador.puntosGrupales}</span>
+                        <span class="puntos-simples" style="color: #64b5f6;">S:${jugador.puntosSimples}</span>
+                        <span class="puntos-grupales" style="color: #66bb6a;">G:${jugador.puntosGrupales}</span>
                     </div>
                 </div>
             </div>
@@ -216,12 +208,10 @@ export function renderizarLeaderboard() {
     
     playersList.innerHTML = html;
     
-    // Agregar evento click a cada tarjeta para mostrar zoom
     playersList.querySelectorAll('.player-card').forEach(card => {
         card.addEventListener('click', function(e) {
             const id = this.dataset.playerId;
             if (id && id !== window.__myId) {
-                // Evitar que el click se propague si estamos en el elemento de posicion
                 if (e.target.closest('.posicion')) return;
                 mostrarZoom(id);
             }

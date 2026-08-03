@@ -1,3 +1,5 @@
+// zoom.js - Eliminar progreso y botón cerrar
+
 import { clonarObjeto, calcularPorcentaje } from './utils.js';
 import { leaderboardManager } from './leaderboard.js';
 
@@ -153,7 +155,7 @@ class ZoomManager {
 export const zoomManager = new ZoomManager();
 
 // ===== UI FUNCTIONS =====
-let zoomModal, zoomBoard, zoomJugadorNombre, zoomInfo;
+let zoomModal, zoomBoard, zoomJugadorNombre;
 let zoomInicializado = false;
 let zoomJugadorActual = null;
 
@@ -162,7 +164,6 @@ function initZoomUI() {
     zoomModal = document.getElementById('zoomModal');
     zoomBoard = document.getElementById('zoomBoard');
     zoomJugadorNombre = document.getElementById('zoomJugadorNombre');
-    zoomInfo = document.getElementById('zoomInfo');
     zoomInicializado = true;
 }
 
@@ -171,7 +172,6 @@ export function mostrarZoom(jugadorId) {
     
     zoomJugadorNombre.textContent = 'Cargando...';
     zoomBoard.innerHTML = '<p>Cargando datos del jugador...</p>';
-    zoomInfo.innerHTML = '';
     zoomModal.style.display = 'flex';
     zoomJugadorActual = jugadorId;
     
@@ -202,17 +202,12 @@ export function actualizarZoomDirecto(jugador) {
     if (!jugador.figura?.celdas) {
         zoomJugadorNombre.textContent = jugador.nombre;
         zoomBoard.innerHTML = '<p>Esperando figura...</p>';
-        zoomInfo.innerHTML = 'Progreso: 0/0 (0%) - Esperando';
         return;
     }
     
     zoomJugadorNombre.textContent = jugador.nombre;
     zoomBoard.innerHTML = renderizarZoomTablero(jugador);
-    
-    const colocadas = jugador.celdasColocadas?.length || 0;
-    const total = jugador.figura.celdas.length;
-    const estado = jugador.estado || 'jugando';
-    zoomInfo.innerHTML = `Progreso: ${colocadas}/${total} (${jugador.progreso || 0}%) - ${estado === 'completado' ? '✅ Completado!' : '🎯 Jugando'}`;
+    // Eliminado: zoomInfo
 }
 
 export function renderizarZoomTablero(jugador) {
@@ -246,7 +241,6 @@ export function renderizarZoomTablero(jugador) {
             
             const id = `${x},${y}`;
             const colocada = colocadasSet.has(id);
-            // ELIMINADO: referencia a inicio
             const completado = jugador.estado === 'completado';
             
             let clases = 'dice-cell';
@@ -254,7 +248,6 @@ export function renderizarZoomTablero(jugador) {
             else if (completado) clases += ' completado';
             else if (colocada) clases += ' colocado';
             else clases += ' disponible';
-            // ELIMINADO: clase inicio
             
             html += `
                 <div class="${clases}">
