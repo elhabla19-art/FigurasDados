@@ -28,7 +28,10 @@ class ZoomManager {
             console.log('Nuevo jugador creado en zoom:', id);
         }
         
-        if (datos.nombre) this.jugadores[id].nombre = datos.nombre;
+        // SOLO ACTUALIZAR EL NOMBRE SI NO ES "Jugador" O SI EL NOMBRE ACTUAL ES "Jugador"
+        if (datos.nombre && (datos.nombre !== 'Jugador' || this.jugadores[id].nombre === 'Jugador')) {
+            this.jugadores[id].nombre = datos.nombre;
+        }
         if (datos.figura) {
             this.jugadores[id].figura = clonarObjeto(datos.figura);
             console.log('Figura actualizada para:', id);

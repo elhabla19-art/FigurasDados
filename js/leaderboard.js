@@ -25,7 +25,10 @@ class LeaderboardManager {
                 conectado: true
             };
         } else {
-            this.jugadores[id].nombre = nombre;
+            // SOLO ACTUALIZAR EL NOMBRE SI NO ES "Jugador" O SI EL NOMBRE ACTUAL ES "Jugador"
+            if (nombre !== 'Jugador' || this.jugadores[id].nombre === 'Jugador') {
+                this.jugadores[id].nombre = nombre;
+            }
             this.jugadores[id].conectado = true;
         }
         

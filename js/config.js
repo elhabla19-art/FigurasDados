@@ -223,13 +223,14 @@ function unirseSala(codigo) {
     
     leaderboardPanel.style.display = 'flex';
     
+    // Asegurar que el nombre del jugador se guarda correctamente
     leaderboardManager.agregarJugador(config.myId, config.myName);
     iniciarJuegoMulti();
     
     var estado = juegoManager.obtenerEstado();
     var jugador = leaderboardManager.obtenerJugador(config.myId);
     mqttManager.publicarEstado({
-        nombre: config.myName,
+        nombre: config.myName,  // Usar el nombre guardado
         figura: estado.figuraActual,
         celdas: estado.celdasColocadas,
         estado: estado.completado ? 'completado' : 'jugando',
@@ -322,13 +323,22 @@ function manejarEstadoCompleto(data) {
     var jugadorId = data.id;
     if (jugadorId === config.myId) return;
     
+    // USAR EL NOMBRE DEL DATA, PERO SI VIENE VACIO O ES "Jugador", NO SOBREESCRIBIR
     var nombre = data.nombre || 'Jugador';
     
     console.log('manejarEstadoCompleto recibido:', data);
     console.log('Figura recibida:', data.figura);
     console.log('Celdas recibidas:', data.celdas);
     
-    // Actualizar leaderboard
+    // Obtener jugador existente para preservar su nombre si es necesario
+    var jugadorExistente = leaderboardManager.obtenerJugador(jugadorId);
+    
+    // Si el nombre es "Jugador" y el jugador ya existe con otro nombre, mantener su nombre
+    if (nombre === 'Jugador' && jugadorExistente && jugadorExistente.nombre !== 'Jugador') {
+        nombre = jugadorExistente.nombre;
+    }
+    
+    // Actualizar leaderboard con el nombre correcto
     leaderboardManager.agregarJugador(jugadorId, nombre);
     if (data.puntos !== undefined) {
         leaderboardManager.establecerPuntuacion(jugadorId, data.puntos);
@@ -339,7 +349,7 @@ function manejarEstadoCompleto(data) {
     
     // Actualizar zoom con TODOS los datos
     zoomManager.actualizarJugador(jugadorId, {
-        nombre: nombre,
+        nombre: nombre,  // Usar el nombre corregido
         figura: data.figura || null,
         celdasColocadas: data.celdas || [],
         estado: data.estado || 'jugando'
@@ -358,7 +368,7 @@ function manejarEstadoCompleto(data) {
         var estado = juegoManager.obtenerEstado();
         var jugador = leaderboardManager.obtenerJugador(config.myId);
         mqttManager.publicarEstado({
-            nombre: config.myName,
+            nombre: config.myName,  // Asegurar que se envía el nombre correcto
             figura: estado.figuraActual,
             celdas: estado.celdasColocadas,
             estado: estado.completado ? 'completado' : 'jugando',
