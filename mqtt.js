@@ -81,8 +81,8 @@ class MQTTManager {
         return this.publicar('figura_grupal', datos);
     }
 
-    publicarCompletar(jugadorId) {
-        return this.publicar('completar', { jugadorId });
+    publicarCompletar(jugadorId, modoFigura) {
+        return this.publicar('completar', { jugadorId, modoFigura });
     }
 
     publicarPuntuacion(jugadorId, puntos) {

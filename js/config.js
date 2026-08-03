@@ -28,6 +28,13 @@ let btnFiguraSimple, btnFiguraGrupal;
 let sincronizando = false;
 let ultimoEstadoRecibido = null;
 
+// Se activa cuando CUALQUIER jugador completa una figura simple (propia o remota).
+// Las figuras simples se transmiten a toda la sala (todos juegan la misma figura),
+// así que en cuanto alguien la resuelve, todos deben poder iniciar una nueva ronda,
+// no solo quien la completó primero. Se reinicia a false cada vez que arranca una
+// ronda nueva (simple o grupal).
+let simpleDesbloqueado = false;
+
 // ===== CONFIGURACIÓN PRINCIPAL =====
 export function configurarJuego(opciones) {
     config.myId = opciones.getMyId();
@@ -102,7 +109,7 @@ function publicarEstadoCompleto() {
 // ===== ACTUALIZACIÓN DE BOTONES =====
 function actualizarBotonesFigura() {
     const estado = juegoManager.obtenerEstado();
-    const bloqueado = estado.figuraActual !== null && !estado.completado;
+    const bloqueado = estado.figuraActual !== null && !estado.completado && !simpleDesbloqueado;
     
     [btnFiguraSimple, btnFiguraGrupal].forEach(btn => {
         if (btn) {
@@ -164,9 +171,10 @@ function configurarEventos(opciones) {
     // Figura Simple
     document.getElementById('btnFiguraSimple').addEventListener('click', () => {
         const estado = juegoManager.obtenerEstado();
-        if (estado.figuraActual && !estado.completado) return;
+        if (estado.figuraActual && !estado.completado && !simpleDesbloqueado) return;
         
         const figura = juegoManager.iniciarModoSimple(config.myId);
+        simpleDesbloqueado = false; // arranca una ronda nueva, vuelve a bloquear hasta que se resuelva
         
         if (config.modoJuego === 'multi' && mqttManager.isConnected()) {
             mqttManager.publicarFiguraGrupal({
@@ -189,9 +197,10 @@ function configurarEventos(opciones) {
         }
         
         const estado = juegoManager.obtenerEstado();
-        if (estado.figuraActual && !estado.completado) return;
+        if (estado.figuraActual && !estado.completado && !simpleDesbloqueado) return;
         
         const figura = juegoManager.iniciarModoGrupal(config.myId);
+        simpleDesbloqueado = false; // arranca una ronda nueva, vuelve a bloquear hasta que se resuelva
         
         if (mqttManager.isConnected()) {
             mqttManager.publicarFiguraGrupal({
@@ -453,6 +462,7 @@ function manejarFiguraGrupalRemota(data) {
     const { figura, modo, nombreGenerador } = data;
     
     sincronizando = true;
+    simpleDesbloqueado = false; // arranca una ronda nueva, vuelve a bloquear hasta que se resuelva
     
     try {
         // Si es grupal, NO reiniciar el estado, solo actualizar la figura
@@ -500,6 +510,13 @@ function manejarCompletarRemoto(data) {
         
         if (data.puntos !== undefined) {
             leaderboardManager.establecerPuntuacion(jugadorId, data.puntos);
+        }
+        
+        if (data.modoFigura === 'simple') {
+            // Figura simple compartida por toda la sala: la completó otro
+            // jugador, así que todos (incluido este cliente) pueden iniciar
+            // una ronda nueva aunque no hayan terminado la suya.
+            simpleDesbloqueado = true;
         }
         
         // Si estamos en modo grupal y el otro completó, verificar si ya estamos completos
@@ -554,7 +571,13 @@ export function handleCellClick(x, y, estaColocada) {
             
             const nuevoEstado = juegoManager.obtenerEstado();
             if (nuevoEstado.completado) {
-                mqttManager.publicarCompletar(config.myId);
+                if (nuevoEstado.modoFigura === 'simple') {
+                    // La figura simple es compartida por toda la sala: en cuanto
+                    // alguien la resuelve, todos deben poder iniciar una ronda
+                    // nueva, no solo quien la completó.
+                    simpleDesbloqueado = true;
+                }
+                mqttManager.publicarCompletar(config.myId, nuevoEstado.modoFigura);
                 const jugador = leaderboardManager.obtenerJugador(config.myId);
                 if (jugador) {
                     mqttManager.publicarPuntuacion(config.myId, jugador.puntos);
