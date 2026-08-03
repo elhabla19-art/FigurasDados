@@ -13,11 +13,11 @@
     <!-- LOBBY PRINCIPAL -->
     <div id="lobbyModal" class="modal-overlay">
         <div class="modal-box">
-            <h2>Figuras Dados</h2>
+            <h2>🎲 Figuras Dados</h2>
             <p>Selecciona un modo de juego</p>
             <div class="input-group">
                 <label>Tu Nombre:</label>
-                <input type="text" id="playerName" placeholder="Ej. Leo" maxlength="10">
+                <input type="text" id="playerName" placeholder="Ej. Leo" maxlength="10" value="Jugador">
             </div>
             <div class="modal-buttons">
                 <div class="row-btns">
@@ -55,7 +55,7 @@
     <!-- REINICIAR -->
     <div id="confirmModal" class="modal-overlay">
         <div class="modal-box">
-            <h3>Reiniciar tablero</h3>
+            <h3>Reiniciar Tablero</h3>
             <p>Se borraran tus marcas actuales.</p>
             <div class="modal-buttons row-btns">
                 <button class="modal-btn btn-outline" id="btnCancelar">Cancelar</button>
@@ -76,13 +76,19 @@
 
     <!-- UI DEL JUEGO -->
     <header>
-        <h1>Figuras Dados</h1>
+        <h1>🎲 Figuras Dados</h1>
         <div id="roomInfoDisplay" class="room-info" style="display: none;"></div>
     </header>
 
     <div class="app-container">
         <div class="board-container">
-            <div class="board" id="game-board"></div>
+            <div class="board" id="game-board">
+                <!-- Estado vacío inicial -->
+                <div style="text-align:center; padding: 30px; color: var(--text-muted);">
+                    <p style="font-size: 1.2rem; margin-bottom: 10px;">🎲 Esperando figura...</p>
+                    <p style="font-size: 0.9rem;">Presiona "Figura Simple" o "Figura Grupal" para comenzar</p>
+                </div>
+            </div>
         </div>
 
         <div class="side-panel">
@@ -95,11 +101,21 @@
                         Figuras: <span id="figuras-completadas">0</span>
                     </div>
                 </div>
-                <button class="modal-btn btn-danger" id="btnReiniciar" style="margin-top: 10px; padding: 8px; font-size: 0.8rem; width: 100%;">Reiniciar Tablero</button>
+                <div style="display: flex; gap: 8px; margin-top: 10px;">
+                    <button class="modal-btn btn-primary" id="btnFiguraSimple" style="flex:1; padding: 8px; font-size: 0.8rem;">
+                        🎯 Figura Simple
+                    </button>
+                    <button class="modal-btn btn-secondary" id="btnFiguraGrupal" style="flex:1; padding: 8px; font-size: 0.8rem;">
+                        👥 Figura Grupal
+                    </button>
+                    <button class="modal-btn btn-danger" id="btnReiniciar" style="flex:0.7; padding: 8px; font-size: 0.8rem;">
+                        🔄 Reiniciar
+                    </button>
+                </div>
             </div>
 
             <div class="leaderboard" id="leaderboardPanel">
-                <h3>Leaderboard</h3>
+                <h3>🏆 Leaderboard</h3>
                 <div id="playersList"></div>
             </div>
         </div>

@@ -57,6 +57,7 @@ class MQTTManager {
         const topics = [
             topicBase + '/jugadores',
             topicBase + '/figura',
+            topicBase + '/figura_grupal',
             topicBase + '/accion',
             topicBase + '/completar',
             topicBase + '/deshacer',
@@ -95,6 +96,7 @@ class MQTTManager {
     // Obtener tipo de mensaje segun el topic
     obtenerTipoMensaje(topic) {
         if (topic.includes('/jugadores')) return 'jugadores';
+        if (topic.includes('/figura_grupal')) return 'figura_grupal';
         if (topic.includes('/figura')) return 'figura';
         if (topic.includes('/accion')) return 'accion';
         if (topic.includes('/completar')) return 'completar';
@@ -112,6 +114,7 @@ class MQTTManager {
         const topics = {
             'jugadores': topicBase + '/jugadores',
             'figura': topicBase + '/figura',
+            'figura_grupal': topicBase + '/figura_grupal',
             'accion': topicBase + '/accion',
             'completar': topicBase + '/completar',
             'deshacer': topicBase + '/deshacer',
@@ -145,6 +148,18 @@ class MQTTManager {
     // Publicar figura actual
     publicarFigura(figura) {
         return this.publicar('figura', { figura });
+    }
+
+    // Publicar figura grupal (simple o grupal)
+    publicarFiguraGrupal(datos) {
+        var payload = {
+            figura: datos.figura,
+            modo: datos.modo || 'simple',
+            generadaPor: datos.generadaPor || this.myId,
+            nombreGenerador: datos.nombreGenerador || 'Jugador',
+            timestamp: Date.now()
+        };
+        return this.publicar('figura_grupal', payload);
     }
 
     // Publicar accion (colocar, deshacer, etc)
@@ -225,7 +240,11 @@ class MQTTManager {
     // Notificar observers
     notificar(data) {
         for (const callback of this.observers) {
-            callback(data);
+            try {
+                callback(data);
+            } catch (e) {
+                console.error('Error en observer de MQTT:', e);
+            }
         }
     }
 }

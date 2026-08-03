@@ -10,6 +10,8 @@
     --color-success: #43a047;
     --color-danger: #e53935;
     --color-warning: #fdd835;
+    --color-grupal: #8e24aa;
+    --color-simple: #1e88e5;
 }
 
 * {
@@ -57,6 +59,7 @@ body {
 
 .modal-box h2 { color: #fff; margin-bottom: 5px; font-size: 1.8rem; }
 .modal-box p { color: var(--text-muted); margin-bottom: 25px; font-size: 0.95rem; }
+.modal-box h3 { color: #fff; margin-bottom: 5px; font-size: 1.4rem; }
 
 .input-group { margin-bottom: 15px; text-align: left; }
 .input-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; }
@@ -81,6 +84,8 @@ body {
 .btn-secondary { background: var(--color-success); color: white; }
 .btn-outline { background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); }
 .btn-danger { background: var(--color-danger); color: white; }
+.btn-grupal { background: var(--color-grupal); color: white; }
+.btn-simple { background: var(--color-simple); color: white; }
 
 #confirmModal { display: none; }
 #joinModal { display: none; }
@@ -234,6 +239,28 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     color: var(--text-main);
 }
 
+/* Modo grupal - celdas colocadas por otros */
+.dice-cell.colocado-grupal {
+    background: rgba(142, 36, 170, 0.3);
+    border-color: var(--color-grupal);
+    cursor: default;
+}
+
+.dice-cell.colocado-grupal .dice-value {
+    color: var(--color-grupal);
+}
+
+/* Modo grupal - celdas colocadas por mí */
+.dice-cell.colocado-grupal-mio {
+    background: rgba(30, 136, 229, 0.3);
+    border-color: var(--color-primary);
+    cursor: default;
+}
+
+.dice-cell.colocado-grupal-mio .dice-value {
+    color: var(--color-primary);
+}
+
 .dice-cell.completado {
     background: var(--color-success);
     border-color: var(--color-success);
@@ -293,6 +320,28 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     border: 1px solid var(--border-color);
 }
 
+/* Badge de contribución (modo grupal) */
+.dice-cell .contribucion-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: var(--color-primary);
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border: 1px solid var(--bg-main);
+}
+
+.dice-cell .contribucion-badge.grupal {
+    background: var(--color-grupal);
+}
+
 @keyframes pulse {
     0%, 100% { opacity: 0.6; }
     50% { opacity: 1; }
@@ -321,6 +370,10 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     color: var(--color-primary);
 }
 
+.puntos-total.modo-grupal {
+    color: var(--color-grupal);
+}
+
 .figuras-completadas {
     font-size: 1rem;
     color: var(--text-muted);
@@ -329,6 +382,26 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
 .figuras-completadas span {
     color: var(--text-main);
     font-weight: bold;
+}
+
+/* Modo grupal - indicador */
+.modo-indicador {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    margin-left: 8px;
+}
+
+.modo-indicador.simple {
+    background: var(--color-simple);
+    color: white;
+}
+
+.modo-indicador.grupal {
+    background: var(--color-grupal);
+    color: white;
 }
 
 /* LEADERBOARD */
@@ -391,6 +464,10 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     color: var(--color-primary);
 }
 
+.player-card .puntos.grupal {
+    color: var(--color-grupal);
+}
+
 .player-card .estado {
     font-size: 0.7rem;
     color: var(--text-muted);
@@ -399,6 +476,13 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
 
 .player-card .estado.completado {
     color: var(--color-success);
+}
+
+/* Modo grupal - contribuciones */
+.player-card .contribuciones {
+    font-size: 0.7rem;
+    color: var(--color-grupal);
+    margin-left: 8px;
 }
 
 /* RESPONSIVE */
@@ -410,10 +494,14 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     .board { min-height: 120px; padding: 6px; }
     .dice-cell { width: 35px; height: 35px; font-size: 1rem; }
     .dice-cell .dice-value { font-size: 1.2rem; }
+    .dice-cell .dice-indice { width: 14px; height: 14px; font-size: 0.5rem; top: -6px; right: -6px; }
+    .dice-cell .dice-orden { width: 14px; height: 14px; font-size: 0.5rem; bottom: -6px; left: -6px; }
+    .dice-cell .contribucion-badge { width: 14px; height: 14px; font-size: 0.4rem; top: -6px; right: -6px; }
     .side-panel { flex: 1; max-width: 250px; justify-content: flex-start; overflow-y: auto; padding-right: 4px; }
     .scoreboard { padding: 6px 10px; }
     .puntos-total { font-size: 1.1rem; }
     .figuras-completadas { font-size: 0.8rem; }
+    .scoreboard .modal-btn { font-size: 0.6rem; padding: 4px 6px; }
     .leaderboard { max-height: 250px; padding: 8px; }
     .player-card { padding: 6px 10px; }
     .player-card .nombre { font-size: 0.8rem; }
@@ -425,6 +513,53 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
 @media (max-width: 480px) {
     .dice-cell { width: 40px; height: 40px; font-size: 1rem; }
     .dice-cell .dice-value { font-size: 1.2rem; }
+    .dice-cell .dice-indice { width: 16px; height: 16px; font-size: 0.5rem; top: -6px; right: -6px; }
+    .dice-cell .dice-orden { width: 16px; height: 16px; font-size: 0.5rem; bottom: -6px; left: -6px; }
+    .dice-cell .contribucion-badge { width: 16px; height: 16px; font-size: 0.4rem; top: -6px; right: -6px; }
+    .scoreboard .modal-btn { font-size: 0.65rem; padding: 6px 8px; }
     #zoomBoard .dice-cell { width: 40px; height: 40px; font-size: 1rem; }
     #zoomBoard .dice-cell .dice-value { font-size: 1.2rem; }
+    .modal-box { padding: 20px; }
+    .modal-box h2 { font-size: 1.4rem; }
+}
+
+/* Animaciones adicionales */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Estilo para notificaciones */
+.notificacion {
+    animation: slideDown 0.3s ease-out;
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-main);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
 }

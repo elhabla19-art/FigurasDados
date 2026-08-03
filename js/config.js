@@ -39,7 +39,6 @@ function configurarJuego(opciones) {
     configurarEventos(opciones);
 }
 
-
 // Configurar observers
 function configurarObservers() {
     console.log('configurarObservers - Registrando observers');
@@ -56,7 +55,8 @@ function configurarObservers() {
                     celdas: estado.celdasColocadas,
                     estado: estado.completado ? 'completado' : 'jugando',
                     puntos: jugador ? jugador.puntos : 0,
-                    figurasCompletadas: jugador ? jugador.figurasCompletadas : 0
+                    figurasCompletadas: jugador ? jugador.figurasCompletadas : 0,
+                    modoFigura: estado.modoFigura || 'simple'
                 });
             }
         });
@@ -149,13 +149,115 @@ function configurarEventos(opciones) {
         iniciarJuegoSolo();
     });
 
-    document.getElementById('btnCancelar').addEventListener('click', function() {
+    // ===== NUEVOS BOTONES: FIGURA SIMPLE Y GRUPAL =====
+    
+    // Botón Figura Simple
+    document.getElementById('btnFiguraSimple').addEventListener('click', function() {
+        var estado = juegoManager.obtenerEstado();
+        if (estado.figuraActual && estado.celdasColocadas.length > 0) {
+            if (!confirm('¿Reiniciar la figura actual? Se perderá el progreso.')) {
+                return;
+            }
+        }
+        
+        var figura = juegoManager.iniciarModoSimple(config.myId);
+        
+        // En modo multijugador, publicar la figura
+        if (config.modoJuego === 'multi' && mqttManager.isConnected()) {
+            mqttManager.publicarFiguraGrupal({
+                figura: figura,
+                modo: 'simple',
+                generadaPor: config.myId,
+                nombreGenerador: config.myName
+            });
+        }
+        
+        // Actualizar UI
+        var nuevoEstado = juegoManager.obtenerEstado();
+        renderizarTablero(nuevoEstado);
+        actualizarUI(nuevoEstado);
+        
+        // En modo multijugador, también publicar estado
+        if (config.modoJuego === 'multi' && mqttManager.isConnected()) {
+            var jugador = leaderboardManager.obtenerJugador(config.myId);
+            mqttManager.publicarEstado({
+                nombre: config.myName,
+                figura: nuevoEstado.figuraActual,
+                celdas: nuevoEstado.celdasColocadas,
+                estado: nuevoEstado.completado ? 'completado' : 'jugando',
+                puntos: jugador ? jugador.puntos : 0,
+                figurasCompletadas: jugador ? jugador.figurasCompletadas : 0,
+                modoFigura: 'simple'
+            });
+        }
+    });
+
+    // Botón Figura Grupal
+    document.getElementById('btnFiguraGrupal').addEventListener('click', function() {
+        if (config.modoJuego !== 'multi') {
+            alert('El modo grupal solo está disponible en multijugador');
+            return;
+        }
+        
+        var estado = juegoManager.obtenerEstado();
+        if (estado.figuraActual && estado.celdasColocadas.length > 0) {
+            if (!confirm('¿Reiniciar la figura actual? Se perderá el progreso grupal.')) {
+                return;
+            }
+        }
+        
+        var figura = juegoManager.iniciarModoGrupal(config.myId);
+        
+        // Publicar la figura grupal
+        if (mqttManager.isConnected()) {
+            mqttManager.publicarFiguraGrupal({
+                figura: figura,
+                modo: 'grupal',
+                generadaPor: config.myId,
+                nombreGenerador: config.myName
+            });
+        }
+        
+        // Actualizar UI
+        var nuevoEstado = juegoManager.obtenerEstado();
+        renderizarTablero(nuevoEstado);
+        actualizarUI(nuevoEstado);
+        
+        // Publicar estado
+        if (mqttManager.isConnected()) {
+            var jugador = leaderboardManager.obtenerJugador(config.myId);
+            mqttManager.publicarEstado({
+                nombre: config.myName,
+                figura: nuevoEstado.figuraActual,
+                celdas: nuevoEstado.celdasColocadas,
+                estado: nuevoEstado.completado ? 'completado' : 'jugando',
+                puntos: jugador ? jugador.puntos : 0,
+                figurasCompletadas: jugador ? jugador.figurasCompletadas : 0,
+                modoFigura: 'grupal',
+                contribuciones: juegoManager.obtenerContribuciones()
+            });
+        }
+    });
+
+    // Botón Reiniciar (limpiar celdas)
+    document.getElementById('btnReiniciar').addEventListener('click', function() {
+        var estado = juegoManager.obtenerEstado();
+        if (!estado.figuraActual) {
+            alert('No hay figura activa para reiniciar');
+            return;
+        }
+        if (estado.celdasColocadas.length === 0) {
+            alert('No hay celdas colocadas para reiniciar');
+            return;
+        }
+        
         var confirmModal = document.getElementById('confirmModal');
-        confirmModal.style.display = 'none';
+        confirmModal.style.display = 'flex';
     });
 
     document.getElementById('btnConfirmarReset').addEventListener('click', function() {
         juegoManager.reiniciarTablero();
+        
         if (config.modoJuego === 'multi' && mqttManager.isConnected()) {
             var estado = juegoManager.obtenerEstado();
             var jugador = leaderboardManager.obtenerJugador(config.myId);
@@ -165,16 +267,17 @@ function configurarEventos(opciones) {
                 celdas: estado.celdasColocadas,
                 estado: estado.completado ? 'completado' : 'jugando',
                 puntos: jugador ? jugador.puntos : 0,
-                figurasCompletadas: jugador ? jugador.figurasCompletadas : 0
+                figurasCompletadas: jugador ? jugador.figurasCompletadas : 0,
+                modoFigura: estado.modoFigura || 'simple'
             });
         }
         var confirmModal = document.getElementById('confirmModal');
         confirmModal.style.display = 'none';
     });
 
-    document.getElementById('btnReiniciar').addEventListener('click', function() {
+    document.getElementById('btnCancelar').addEventListener('click', function() {
         var confirmModal = document.getElementById('confirmModal');
-        confirmModal.style.display = 'flex';
+        confirmModal.style.display = 'none';
     });
 
     document.getElementById('btnCerrarZoom').addEventListener('click', function() {
@@ -225,17 +328,21 @@ function unirseSala(codigo) {
     
     // Asegurar que el nombre del jugador se guarda correctamente
     leaderboardManager.agregarJugador(config.myId, config.myName);
-    iniciarJuegoMulti();
+    
+    // Iniciar en modo vacío
+    juegoManager.iniciarVacio(config.myId);
+    juegoManager.setModo('multi', codigo);
     
     var estado = juegoManager.obtenerEstado();
     var jugador = leaderboardManager.obtenerJugador(config.myId);
     mqttManager.publicarEstado({
-        nombre: config.myName,  // Usar el nombre guardado
+        nombre: config.myName,
         figura: estado.figuraActual,
         celdas: estado.celdasColocadas,
         estado: estado.completado ? 'completado' : 'jugando',
         puntos: jugador ? jugador.puntos : 0,
         figurasCompletadas: jugador ? jugador.figurasCompletadas : 0,
+        modoFigura: estado.modoFigura || 'simple',
         accion: 'join'
     });
     
@@ -260,7 +367,8 @@ function unirseSala(codigo) {
                 celdas: estadoActual.celdasColocadas,
                 estado: estadoActual.completado ? 'completado' : 'jugando',
                 puntos: jugadorActual ? jugadorActual.puntos : 0,
-                figurasCompletadas: jugadorActual ? jugadorActual.figurasCompletadas : 0
+                figurasCompletadas: jugadorActual ? jugadorActual.figurasCompletadas : 0,
+                modoFigura: estadoActual.modoFigura || 'simple'
             });
         }
     }, 3000);
@@ -278,13 +386,13 @@ function iniciarJuegoSolo() {
     
     leaderboardManager.agregarJugador(config.myId, config.myName);
     juegoManager.setModo('solo');
-    juegoManager.iniciarRonda(config.myId);
+    juegoManager.iniciarVacio(config.myId);
 }
 
 // Iniciar juego multijugador
 function iniciarJuegoMulti() {
     juegoManager.setModo('multi', config.salaActual);
-    juegoManager.iniciarRonda(config.myId);
+    juegoManager.iniciarVacio(config.myId);
 }
 
 // Manejar mensajes MQTT
@@ -300,6 +408,9 @@ function manejarMensajeMQTT(mensaje) {
             break;
         case 'figura':
             manejarFiguraRemota(data);
+            break;
+        case 'figura_grupal':
+            manejarFiguraGrupalRemota(data);
             break;
         case 'accion':
             manejarAccionRemota(data);
@@ -319,16 +430,75 @@ function manejarMensajeMQTT(mensaje) {
     }
 }
 
+// Manejar figura grupal remota
+function manejarFiguraGrupalRemota(data) {
+    var figura = data.figura;
+    var modo = data.modo || 'simple';
+    var generadaPor = data.generadaPor;
+    var nombreGenerador = data.nombreGenerador || 'Jugador';
+    
+    console.log('Figura grupal recibida:', modo, 'generada por:', nombreGenerador);
+    
+    // Actualizar el juego con la figura recibida
+    if (modo === 'grupal') {
+        juegoManager.iniciarModoGrupal(config.myId, figura);
+        // Mostrar notificación de que alguien generó la figura
+        mostrarNotificacion(nombreGenerador + ' ha generado una figura GRUPAL!');
+    } else {
+        juegoManager.iniciarModoSimple(config.myId, figura);
+        mostrarNotificacion(nombreGenerador + ' ha generado una figura!');
+    }
+    
+    // Actualizar UI
+    var estado = juegoManager.obtenerEstado();
+    renderizarTablero(estado);
+    actualizarUI(estado);
+}
+
+// Mostrar notificación temporal
+function mostrarNotificacion(mensaje) {
+    var notificacion = document.createElement('div');
+    notificacion.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--bg-panel);
+        color: var(--text-main);
+        padding: 12px 24px;
+        border-radius: 12px;
+        border: 2px solid var(--color-primary);
+        z-index: 5000;
+        font-weight: bold;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        animation: slideDown 0.3s ease-out;
+        max-width: 90%;
+        text-align: center;
+    `;
+    notificacion.textContent = mensaje;
+    document.body.appendChild(notificacion);
+    
+    setTimeout(function() {
+        notificacion.style.transition = 'opacity 0.5s';
+        notificacion.style.opacity = '0';
+        setTimeout(function() {
+            if (notificacion.parentNode) {
+                notificacion.remove();
+            }
+        }, 500);
+    }, 3000);
+}
+
 function manejarEstadoCompleto(data) {
     var jugadorId = data.id;
     if (jugadorId === config.myId) return;
     
-    // USAR EL NOMBRE DEL DATA, PERO SI VIENE VACIO O ES "Jugador", NO SOBREESCRIBIR
     var nombre = data.nombre || 'Jugador';
     
     console.log('manejarEstadoCompleto recibido:', data);
     console.log('Figura recibida:', data.figura);
     console.log('Celdas recibidas:', data.celdas);
+    console.log('Modo figura:', data.modoFigura);
     
     // Obtener jugador existente para preservar su nombre si es necesario
     var jugadorExistente = leaderboardManager.obtenerJugador(jugadorId);
@@ -347,9 +517,18 @@ function manejarEstadoCompleto(data) {
         leaderboardManager.actualizarEstado(jugadorId, data.estado);
     }
     
+    // Si es modo grupal, actualizar celdas grupales
+    if (data.modoFigura === 'grupal' && data.celdas) {
+        // Solo actualizar si el jugador es el que envió la figura grupal
+        // O si es una sincronización inicial
+        if (data.accion === 'sync_request' || data.accion === 'join') {
+            // No hacer nada, esperar la figura grupal
+        }
+    }
+    
     // Actualizar zoom con TODOS los datos
     zoomManager.actualizarJugador(jugadorId, {
-        nombre: nombre,  // Usar el nombre corregido
+        nombre: nombre,
         figura: data.figura || null,
         celdasColocadas: data.celdas || [],
         estado: data.estado || 'jugando'
@@ -368,12 +547,13 @@ function manejarEstadoCompleto(data) {
         var estado = juegoManager.obtenerEstado();
         var jugador = leaderboardManager.obtenerJugador(config.myId);
         mqttManager.publicarEstado({
-            nombre: config.myName,  // Asegurar que se envía el nombre correcto
+            nombre: config.myName,
             figura: estado.figuraActual,
             celdas: estado.celdasColocadas,
             estado: estado.completado ? 'completado' : 'jugando',
             puntos: jugador ? jugador.puntos : 0,
-            figurasCompletadas: jugador ? jugador.figurasCompletadas : 0
+            figurasCompletadas: jugador ? jugador.figurasCompletadas : 0,
+            modoFigura: estado.modoFigura || 'simple'
         });
     }
 }
@@ -483,6 +663,12 @@ function manejarListaJugadores(data) {
 function handleCellClick(x, y, estaColocada) {
     console.log('handleCellClick llamado:', x, y, estaColocada);
     var estado = juegoManager.obtenerEstado();
+    
+    if (!estado.figuraActual) {
+        console.log('No hay figura activa');
+        return;
+    }
+    
     if (estado.completado) {
         console.log('Figura completada, no se puede modificar');
         return;
@@ -498,14 +684,14 @@ function handleCellClick(x, y, estaColocada) {
             });
             var nuevoEstado = juegoManager.obtenerEstado();
             var jugador = leaderboardManager.obtenerJugador(config.myId);
-            // Enviar estado completo con figura y celdas
             mqttManager.publicarEstado({
                 nombre: config.myName,
                 figura: nuevoEstado.figuraActual,
                 celdas: nuevoEstado.celdasColocadas,
                 estado: nuevoEstado.completado ? 'completado' : 'jugando',
                 puntos: jugador ? jugador.puntos : 0,
-                figurasCompletadas: jugador ? jugador.figurasCompletadas : 0
+                figurasCompletadas: jugador ? jugador.figurasCompletadas : 0,
+                modoFigura: nuevoEstado.modoFigura || 'simple'
             });
         }
         return;
@@ -520,14 +706,14 @@ function handleCellClick(x, y, estaColocada) {
         });
         var nuevoEstado = juegoManager.obtenerEstado();
         var jugador = leaderboardManager.obtenerJugador(config.myId);
-        // Enviar estado completo con figura y celdas
         mqttManager.publicarEstado({
             nombre: config.myName,
             figura: nuevoEstado.figuraActual,
             celdas: nuevoEstado.celdasColocadas,
             estado: nuevoEstado.completado ? 'completado' : 'jugando',
             puntos: jugador ? jugador.puntos : 0,
-            figurasCompletadas: jugador ? jugador.figurasCompletadas : 0
+            figurasCompletadas: jugador ? jugador.figurasCompletadas : 0,
+            modoFigura: nuevoEstado.modoFigura || 'simple'
         });
         
         if (nuevoEstado.completado) {
