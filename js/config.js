@@ -12,6 +12,11 @@ import {
 import { mqttManager } from '../mqtt.js';
 import { generarIdCorto, clonarObjeto } from './utils.js';
 
+// ===== DETECTAR MODO AUTOMATICO =====
+const urlParams = new URLSearchParams(window.location.search);
+const isAutoMode = urlParams.get('auto') === '1';
+const AUTO_ROOM_CODE = 'GRIL';
+
 // Configuración
 let config = {
     myId: null,
@@ -134,19 +139,44 @@ function configurarEventos(opciones) {
         conectarSala(config.salaActual);
     });
     
-    // Unirse a Sala
+    // Unirse a Sala - MODIFICADO CON MODO AUTOMATICO
     document.getElementById('btnUnirse').addEventListener('click', () => {
+        const roomInput = document.getElementById('roomCodeInput');
+        
+        // Si estamos en modo automatico, precargar el codigo
+        if (isAutoMode) {
+            if (roomInput) {
+                roomInput.value = AUTO_ROOM_CODE;
+                roomInput.readOnly = true;
+                roomInput.style.opacity = '0.7';
+                roomInput.style.color = '#4CAF50';
+            }
+        } else {
+            if (roomInput) {
+                roomInput.value = '';
+                roomInput.readOnly = false;
+                roomInput.style.opacity = '1';
+                roomInput.style.color = 'white';
+            }
+        }
+        
         document.getElementById('joinModal').style.display = 'flex';
         document.getElementById('lobbyModal').style.display = 'none';
     });
     
+    // Entrar a Sala - MODIFICADO CON MODO AUTOMATICO
     document.getElementById('btnEntrar').addEventListener('click', () => {
         config.myName = document.getElementById('playerName').value.trim() || 'Jugador';
-        const codigo = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+        let codigo;
         
-        if (codigo.length !== 4) {
-            alert('El código debe tener 4 caracteres');
-            return;
+        if (isAutoMode) {
+            codigo = AUTO_ROOM_CODE;
+        } else {
+            codigo = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            if (codigo.length !== 4) {
+                alert('El código debe tener 4 caracteres');
+                return;
+            }
         }
         
         config.salaActual = codigo;
@@ -156,7 +186,18 @@ function configurarEventos(opciones) {
         conectarSala(codigo);
     });
     
-    document.getElementById('btnVolver').addEventListener('click', mostrarModalLobby);
+    // Volver al Lobby - MODIFICADO PARA LIMPIAR CAMPO
+    document.getElementById('btnVolver').addEventListener('click', () => {
+        const roomInput = document.getElementById('roomCodeInput');
+        if (roomInput) {
+            roomInput.value = '';
+            roomInput.placeholder = 'ABCD';
+            roomInput.readOnly = false;
+            roomInput.style.opacity = '1';
+            roomInput.style.color = 'white';
+        }
+        mostrarModalLobby();
+    });
     
     // Jugar Solo
     document.getElementById('btnJugarSolo').addEventListener('click', () => {
@@ -594,5 +635,7 @@ export {
     unirseSala,
     iniciarJuegoSolo,
     actualizarBotonesFigura,
-    publicarEstadoCompleto
+    publicarEstadoCompleto,
+    isAutoMode,
+    AUTO_ROOM_CODE
 };

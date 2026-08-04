@@ -41,6 +41,15 @@ function handleBoardClick(e) {
 }
 
 export function mostrarModalLobby() {
+    const roomInput = document.getElementById('roomCodeInput');
+    if (roomInput) {
+        roomInput.value = '';
+        roomInput.placeholder = 'ABCD';
+        roomInput.readOnly = false;
+        roomInput.style.opacity = '1';
+        roomInput.style.color = 'white';
+    }
+    
     document.getElementById('lobbyModal').style.display = 'flex';
     document.getElementById('joinModal').style.display = 'none';
     document.getElementById('loadingModal').style.display = 'none';

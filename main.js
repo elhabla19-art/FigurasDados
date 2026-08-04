@@ -2,6 +2,11 @@ import { configurarJuego } from './js/config.js';
 import { initUI } from './js/ui.js';
 import { mqttManager } from './mqtt.js';
 
+// ===== DETECTAR MODO AUTOMATICO =====
+const urlParams = new URLSearchParams(window.location.search);
+const isAutoMode = urlParams.get('auto') === '1';
+const AUTO_ROOM_CODE = 'GRIL';
+
 // Variables globales
 let myId = null;
 let myName = '';
@@ -44,5 +49,7 @@ export {
     myId,
     myName,
     modoJuego,
-    salaActual
+    salaActual,
+    isAutoMode,
+    AUTO_ROOM_CODE
 };
