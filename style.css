@@ -1,17 +1,17 @@
 :root {
-    --bg-main: #121212;
-    --bg-panel: #1e1e1e;
+    --bg-main: #262626;
+    --bg-panel: #1a1a1a;
     --bg-box: #2d2d2d;
     --bg-box-marked: #1a1a1a;
-    --text-main: #e0e0e0;
+    --text-main: #ECE5DB;
     --text-muted: #9e9e9e;
     --border-color: #333333;
-    --color-primary: #1e88e5;
-    --color-success: #43a047;
-    --color-danger: #e53935;
-    --color-warning: #fdd835;
-    --color-grupal: #66bb6a;
-    --color-simple: #64b5f6;
+    --color-primary: #553B61;
+    --color-success: #265F56;
+    --color-danger: #C7403F;
+    --color-warning: #EBC21A;
+    --color-grupal: #265F56;
+    --color-simple: #553B61;
 }
 
 * {
@@ -99,8 +99,8 @@ body {
     transform: none;
 }
 
-.btn-primary { background: var(--color-primary); color: white; }
-.btn-secondary { background: var(--color-success); color: white; }
+.btn-primary { background: #553B61; color: white; }
+.btn-secondary { background: #553B61; color: white; }
 .btn-outline { background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); }
 .btn-danger { background: var(--color-danger); color: white; }
 .btn-grupal { background: var(--color-grupal); color: white; }
