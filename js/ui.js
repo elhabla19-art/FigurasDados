@@ -1,93 +1,92 @@
-// ui.js
-
 import { juegoManager } from './juego.js';
-import { leaderboardManager } from './leaderboard.js';
-import { mostrarZoom, actualizarZoomDirecto, renderizarZoomTablero } from './zoom.js';
-import { handleCellClick } from './config.js';
 import { renderizarDado } from './utils.js';
 
-let gameBoard, playersList;
-let clickHandlerAttached = false;
-let ultimoEstadoRenderizado = null;
+var gameBoard = null;
+var clickHandlerAttached = false;
+var ultimoEstadoRenderizado = null;
 
 export function initUI() {
     gameBoard = document.getElementById('game-board');
-    playersList = document.getElementById('playersList');
     
-    if (!clickHandlerAttached && gameBoard) {
+    if (!gameBoard) {
+        console.error('No se encontró el elemento game-board');
+        return;
+    }
+    
+    if (!clickHandlerAttached) {
         gameBoard.addEventListener('click', handleBoardClick);
         clickHandlerAttached = true;
     }
 }
 
 function handleBoardClick(e) {
-    const cell = e.target.closest('.dice-cell');
+    var cell = e.target.closest('.dice-cell');
     if (!cell) return;
     
     if (cell.classList.contains('vacio') || cell.classList.contains('completado')) {
         return;
     }
     
-    const x = parseInt(cell.dataset.x);
-    const y = parseInt(cell.dataset.y);
+    var x = parseInt(cell.dataset.x);
+    var y = parseInt(cell.dataset.y);
     if (isNaN(x) || isNaN(y)) return;
     
-    const colocada = cell.dataset.colocada === 'true';
-    const esDeFigura = cell.dataset.esfigura === 'true';
+    var colocada = cell.dataset.colocada === 'true';
+    var esDeFigura = cell.dataset.esfigura === 'true';
     
     if (!esDeFigura) return;
     
     handleCellClick(x, y, colocada);
 }
 
-export function mostrarModalLobby() {
-    const roomInput = document.getElementById('roomCodeInput');
-    if (roomInput) {
-        roomInput.value = '';
-        roomInput.placeholder = 'ABCD';
-        roomInput.readOnly = false;
-        roomInput.style.opacity = '1';
-        roomInput.style.color = 'white';
+function handleCellClick(x, y, estaColocada) {
+    var estado = juegoManager.obtenerEstado();
+    
+    if (!estado.figuraActual || estado.completado) {
+        return;
     }
     
-    document.getElementById('lobbyModal').style.display = 'flex';
-    document.getElementById('joinModal').style.display = 'none';
-    document.getElementById('loadingModal').style.display = 'none';
-    document.getElementById('confirmModal').style.display = 'none';
-    document.getElementById('zoomModal').style.display = 'none';
-}
-
-export function mostrarLoading(texto) {
-    document.getElementById('loadingText').textContent = texto || 'Conectando...';
-    document.getElementById('loadingModal').style.display = 'flex';
-}
-
-export function ocultarLoading() {
-    document.getElementById('loadingModal').style.display = 'none';
+    // Si la celda ya está colocada, deshacer (LIFO)
+    if (estaColocada) {
+        juegoManager.deshacerCelda(x, y);
+        return;
+    }
+    
+    // Verificar que la celda pertenece a la figura
+    if (!juegoManager.esCeldaDeFigura(x, y)) {
+        return;
+    }
+    
+    // Colocar dado
+    juegoManager.colocarDado(x, y);
 }
 
 export function renderizarTablero(estado) {
-    const figuraActual = estado.figuraActual;
-    const celdasColocadas = estado.celdasColocadas;
-    const completado = estado.completado;
+    if (!gameBoard) {
+        gameBoard = document.getElementById('game-board');
+        if (!gameBoard) return;
+    }
+    
+    var figuraActual = estado.figuraActual;
+    var celdasColocadas = estado.celdasColocadas || [];
+    var completado = estado.completado || false;
     
     if (!figuraActual) {
-        gameBoard.innerHTML = `
-            <div style="text-align:center; padding: 30px; color: var(--text-muted);">
-                <p style="font-size: 1.2rem; margin-bottom: 10px;">Esperando figura...</p>
-                <p style="font-size: 0.9rem;">Presiona "Figura Simple" o "Figura Grupal" para comenzar</p>
-            </div>
-        `;
+        gameBoard.innerHTML = 
+            '<div style="text-align:center; padding: 30px; color: var(--text-muted);">' +
+                '<p style="font-size: 1.2rem; margin-bottom: 10px;">Esperando figura...</p>' +
+                '<p style="font-size: 0.9rem;">Presiona "Figura Simple" o "Figura Grupal" para comenzar</p>' +
+            '</div>';
         ultimoEstadoRenderizado = null;
         return;
     }
     
-    const hash = JSON.stringify({
-        figuraId: figuraActual.id,
-        celdasColocadas: celdasColocadas.map(c => `${c.x},${c.y}`).sort().join('|'),
+    // Verificar si hay cambios para evitar re-renderizados innecesarios
+    var hash = JSON.stringify({
+        figuraId: figuraActual.id || 'none',
+        celdasColocadas: celdasColocadas.map(function(c) { return c.x + ',' + c.y; }).sort().join('|'),
         completado: completado,
-        modoFigura: estado.modoFigura,
-        totalCeldas: figuraActual.celdas.length
+        totalCeldas: figuraActual.celdas ? figuraActual.celdas.length : 0
     });
     
     if (ultimoEstadoRenderizado === hash) {
@@ -95,20 +94,34 @@ export function renderizarTablero(estado) {
     }
     ultimoEstadoRenderizado = hash;
     
-    const celdas = figuraActual.celdas;
-    const xs = celdas.map(c => c.x);
-    const ys = celdas.map(c => c.y);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-    const ancho = maxX - minX + 1;
+    var celdas = figuraActual.celdas || [];
+    if (celdas.length === 0) {
+        gameBoard.innerHTML = '<p style="color: var(--text-muted);">Figura vacía</p>';
+        return;
+    }
     
-    const colocadasSet = new Set(celdasColocadas.map(c => `${c.x},${c.y}`));
+    // Calcular dimensiones
+    var xs = [];
+    var ys = [];
+    for (var i = 0; i < celdas.length; i++) {
+        xs.push(celdas[i].x);
+        ys.push(celdas[i].y);
+    }
+    var minX = Math.min.apply(null, xs);
+    var maxX = Math.max.apply(null, xs);
+    var minY = Math.min.apply(null, ys);
+    var maxY = Math.max.apply(null, ys);
+    var ancho = maxX - minX + 1;
     
-    const totalCeldas = celdas.length;
-    let cellSize = '50px';
-    let gap = '8px';
+    // Celdas colocadas en un Set para búsqueda rápida
+    var colocadasSet = {};
+    for (var j = 0; j < celdasColocadas.length; j++) {
+        colocadasSet[celdasColocadas[j].x + ',' + celdasColocadas[j].y] = true;
+    }
+    
+    var totalCeldas = celdas.length;
+    var cellSize = '50px';
+    var gap = '8px';
     
     if (totalCeldas > 25) {
         cellSize = '35px';
@@ -121,38 +134,39 @@ export function renderizarTablero(estado) {
         gap = '7px';
     }
     
-    let html = `<div class="dice-grid" style="grid-template-columns: repeat(${ancho}, 1fr); gap: ${gap}; padding: 8px;">`;
+    var html = '<div class="dice-grid" style="grid-template-columns: repeat(' + ancho + ', 1fr); gap: ' + gap + '; padding: 8px;">';
     
-    for (let y = minY; y <= maxY; y++) {
-        for (let x = minX; x <= maxX; x++) {
-            const celda = celdas.find(c => c.x === x && c.y === y);
+    for (var y = minY; y <= maxY; y++) {
+        for (var x = minX; x <= maxX; x++) {
+            // Buscar celda en la figura
+            var celda = null;
+            for (var k = 0; k < celdas.length; k++) {
+                if (celdas[k].x === x && celdas[k].y === y) {
+                    celda = celdas[k];
+                    break;
+                }
+            }
             
             if (!celda) {
-                html += `<div class="dice-cell vacio" style="width: ${cellSize}; height: ${cellSize};"></div>`;
+                html += '<div class="dice-cell vacio" style="width: ' + cellSize + '; height: ' + cellSize + ';"></div>';
                 continue;
             }
             
-            const id = `${x},${y}`;
-            const colocada = colocadasSet.has(id);
+            var id = x + ',' + y;
+            var colocada = !!colocadasSet[id];
             
-            let clase = 'dice-cell';
+            var clase = 'dice-cell';
             if (completado) {
                 clase += ' completado';
             } else if (colocada) {
                 clase += ' colocado';
             }
             
-            const dadoHtml = renderizarDado(celda.valor);
+            var dadoHtml = renderizarDado(celda.valor);
             
-            html += `
-                <div class="${clase}" 
-                     data-x="${x}" data-y="${y}" 
-                     data-colocada="${colocada}" 
-                     data-esfigura="true"
-                     style="width: ${cellSize}; height: ${cellSize};">
-                    ${dadoHtml}
-                </div>
-            `;
+            html += '<div class="' + clase + '" data-x="' + x + '" data-y="' + y + '" data-colocada="' + colocada + '" data-esfigura="true" style="width: ' + cellSize + '; height: ' + cellSize + ';">';
+            html += dadoHtml;
+            html += '</div>';
         }
     }
     
@@ -161,55 +175,5 @@ export function renderizarTablero(estado) {
 }
 
 export function actualizarUI(estado) {
-    // Los puntajes ahora solo se ven en el leaderboard
+    // UI simplificada - no es necesario hacer nada adicional
 }
-
-export function renderizarLeaderboard() {
-    const ranking = leaderboardManager.obtenerRanking();
-    const myId = window.__myId || null;
-    
-    if (ranking.length === 0) {
-        playersList.innerHTML = '<p style="text-align:center;color:var(--text-muted);">Esperando jugadores...</p>';
-        return;
-    }
-    
-    let html = '';
-    
-    for (let i = 0; i < ranking.length; i++) {
-        const jugador = ranking[i];
-        const esMi = jugador.id === myId;
-        
-        const posicion = i + 1;
-        const medalla = posicion === 1 ? '🥇' : posicion === 2 ? '🥈' : posicion === 3 ? '🥉' : `#${posicion}`;
-        
-        html += `
-            <div class="player-card ${esMi ? 'me' : ''}" data-player-id="${jugador.id}">
-                <div class="player-info">
-                    <span class="posicion">${medalla}</span>
-                    <span class="nombre">${jugador.nombre}${esMi ? ' (Tu)' : ''}</span>
-                </div>
-                <div class="player-puntos">
-                    <span class="puntos-total" style="color: #ffffff;">${jugador.puntos}</span>
-                    <div class="puntos-detalle">
-                        <span class="puntos-simples" style="color: #64b5f6;">S:${jugador.puntosSimples}</span>
-                        <span class="puntos-grupales" style="color: #66bb6a;">G:${jugador.puntosGrupales}</span>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    playersList.innerHTML = html;
-    
-    playersList.querySelectorAll('.player-card').forEach(card => {
-        card.addEventListener('click', function(e) {
-            const id = this.dataset.playerId;
-            if (id && id !== window.__myId) {
-                if (e.target.closest('.posicion')) return;
-                mostrarZoom(id);
-            }
-        });
-    });
-}
-
-export { mostrarZoom, actualizarZoomDirecto, renderizarZoomTablero };

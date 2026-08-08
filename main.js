@@ -1,55 +1,42 @@
-import { configurarJuego } from './js/config.js';
-import { initUI } from './js/ui.js';
-import { mqttManager } from './mqtt.js';
+import { juegoManager } from './js/juego.js';
+import { initUI, renderizarTablero, actualizarUI } from './js/ui.js';
 
-// ===== DETECTAR MODO AUTOMATICO =====
-const urlParams = new URLSearchParams(window.location.search);
-const isAutoMode = urlParams.get('auto') === '1';
-const AUTO_ROOM_CODE = 'GRIL';
+var juegoIniciado = false;
 
-// Variables globales
-let myId = null;
-let myName = '';
-let modoJuego = 'solo';
-let salaActual = null;
-
-// Inicializar
-document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar UI
+function iniciarJuego() {
+    if (juegoIniciado) return;
+    juegoIniciado = true;
+    
+    document.getElementById('startModal').style.display = 'none';
+    
+    // Configurar juego
+    var jugadorId = 'player_' + Math.random().toString(36).substring(2, 10);
+    juegoManager.setJugadorId(jugadorId);
+    juegoManager.iniciarVacio();
+    
+    // Inicializar UI (esto agrega el event listener de clics)
     initUI();
     
-    // Limpiar campo de nombre
-    document.getElementById('playerName').value = '';
-    
-    // Exponer mqttManager globalmente
-    window.__mqttManager = mqttManager;
-    
-    // Configurar juego con callbacks
-    configurarJuego({
-        getMyId: function() { return myId; },
-        getMyName: function() { return myName; },
-        getModoJuego: function() { return modoJuego; },
-        getSalaActual: function() { return salaActual; },
-        setMyId: function(id) { 
-            myId = id; 
-            window.__myId = id;
-        },
-        setMyName: function(nombre) { 
-            myName = nombre;
-            window.__myName = nombre;
-        },
-        setModoJuego: function(modo) { modoJuego = modo; },
-        setSalaActual: function(sala) { salaActual = sala; },
-        mqttManager: mqttManager
+    // Suscribir observers para actualizar el tablero
+    juegoManager.suscribir(function(estado) {
+        renderizarTablero(estado);
+        actualizarUI(estado);
     });
-});
+    
+    // Boton Figura Simple
+    document.getElementById('btnFiguraSimple').addEventListener('click', function() {
+        juegoManager.iniciarFigura('simple');
+    });
+    
+    // Boton Figura Grupal
+    document.getElementById('btnFiguraGrupal').addEventListener('click', function() {
+        juegoManager.iniciarFigura('grupal');
+    });
+    
+    // Renderizar estado inicial
+    renderizarTablero(juegoManager.obtenerEstado());
+}
 
-// Exportar para uso en otros modulos
-export {
-    myId,
-    myName,
-    modoJuego,
-    salaActual,
-    isAutoMode,
-    AUTO_ROOM_CODE
-};
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('btnEntrar').addEventListener('click', iniciarJuego);
+});

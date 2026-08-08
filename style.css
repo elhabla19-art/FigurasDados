@@ -10,8 +10,6 @@
     --color-success: #265F56;
     --color-danger: #C7403F;
     --color-warning: #EBC21A;
-    --color-grupal: #265F56;
-    --color-simple: #553B61;
 }
 
 * {
@@ -57,31 +55,11 @@ body {
     border: 1px solid var(--border-color);
 }
 
-.modal-box h2, .modal-box h3 { color: #fff; margin-bottom: 5px; }
-.modal-box h2 { font-size: 1.8rem; }
-.modal-box h3 { font-size: 1.4rem; }
+.modal-box h2 { color: #fff; margin-bottom: 5px; font-size: 1.8rem; }
 .modal-box p { color: var(--text-muted); margin-bottom: 25px; font-size: 0.95rem; }
-
-/* INPUTS */
-.input-group { margin-bottom: 15px; text-align: left; }
-.input-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; }
-.input-group input {
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    background: var(--bg-box);
-    border: 1px solid var(--border-color);
-    color: white;
-    font-size: 1.1rem;
-    font-weight: bold;
-    text-align: center;
-}
-.input-group input:focus { outline: none; border-color: var(--color-primary); }
 
 /* BOTONES */
 .modal-buttons { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
-.modal-buttons .row-btns { display: flex; gap: 10px; }
-
 .modal-btn {
     padding: 14px 15px;
     border: none;
@@ -93,85 +71,16 @@ body {
     transition: transform 0.1s, opacity 0.2s;
 }
 .modal-btn:active { transform: scale(0.97); }
-.modal-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-}
 
 .btn-primary { background: #553B61; color: white; }
 .btn-secondary { background: #553B61; color: white; }
-.btn-outline { background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); }
-.btn-danger { background: var(--color-danger); color: white; }
-.btn-grupal { background: var(--color-grupal); color: white; }
-.btn-simple { background: var(--color-simple); color: white; }
 
-#confirmModal, #joinModal, #loadingModal { display: none; }
-#loadingModal { z-index: 3000; }
-#zoomModal { display: none; z-index: 2500; }
-
-/* ZOOM */
-#zoomBoard {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 150px;
-    background: var(--bg-main);
-    border-radius: 12px;
-    padding: 15px;
-    border: 1px solid var(--border-color);
-}
-
-#zoomBoard .dice-grid {
-    display: grid;
-    gap: 10px;
-    padding: 10px;
-}
-
-#zoomBoard .dice-cell {
-    width: 60px;
-    height: 60px;
-    border-radius: 10px;
-    background: var(--bg-box);
-    border: 2px solid var(--border-color);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 1.8rem;
-    font-weight: bold;
-    user-select: none;
-}
-#zoomBoard .dice-cell.colocado {
-    background: var(--bg-box-marked);
-    border-color: var(--color-success);
-    opacity: 0.8;
-}
-#zoomBoard .dice-cell.completado {
-    background: var(--color-success);
-    border-color: var(--color-success);
-    color: white;
-    opacity: 0.6;
-}
-#zoomBoard .dice-cell.vacio {
-    background: transparent;
-    border-color: transparent;
-}
-#zoomBoard .dice-cell .dice-value { font-size: 2rem; font-weight: 900; }
+#startModal { display: flex; }
+#startModal .modal-box { max-width: 380px; }
 
 /* HEADER */
 header { text-align: center; margin-bottom: 15px; width: 100%; }
 h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #fff; }
-.room-info {
-    display: inline-block;
-    background: var(--bg-box);
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 0.85rem;
-    color: var(--color-warning);
-    font-weight: bold;
-    margin-top: 5px;
-    border: 1px solid var(--border-color);
-}
 
 /* APP */
 .app-container {
@@ -222,8 +131,6 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 1.4rem;
-    font-weight: bold;
     user-select: none;
     transition: transform 0.2s ease;
     cursor: pointer;
@@ -236,7 +143,6 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     pointer-events: none;
 }
 
-/* Solo las celdas disponibles (sin marcar) se elevan al hacer hover */
 .dice-cell:not(.colocado):not(.completado):not(.vacio):hover {
     transform: translateY(-4px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
@@ -260,16 +166,7 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     pointer-events: none;
 }
 
-.dice-cell.completado .dice-value {
-    color: white;
-}
-
-.dice-cell .dice-value {
-    font-size: 1.6rem;
-    font-weight: 900;
-}
-
-/* Estilos para dados visuales con puntos */
+/* Dados visuales */
 .dado-visual {
     background: #2d2d2d;
     border-radius: 8px;
@@ -302,28 +199,6 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     background: #ffffff !important;
 }
 
-#zoomBoard .dado-visual {
-    background: #2d2d2d;
-    border-radius: 8px;
-    padding: 2px;
-}
-
-#zoomBoard .dice-cell.colocado .dado-visual {
-    background: #1a1a1a;
-}
-
-#zoomBoard .dice-cell.colocado .dado-visual > div > div {
-    background: #4caf50 !important;
-}
-
-#zoomBoard .dice-cell.completado .dado-visual {
-    background: #43a047;
-}
-
-#zoomBoard .dice-cell.completado .dado-visual > div > div {
-    background: #ffffff !important;
-}
-
 /* SIDE PANEL */
 .side-panel { width: 100%; display: flex; flex-direction: column; gap: 10px; }
 
@@ -334,72 +209,6 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     width: 100%;
     border: 1px solid var(--border-color);
 }
-
-/* LEADERBOARD */
-.leaderboard {
-    display: none;
-    background: var(--bg-panel);
-    padding: 12px;
-    border-radius: 12px;
-    border: 1px solid var(--border-color);
-    flex-direction: column;
-    gap: 10px;
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.leaderboard h3 {
-    font-size: 1rem;
-    color: var(--text-main);
-    text-align: center;
-    letter-spacing: 1px;
-}
-
-#playersList { display: flex; flex-direction: column; gap: 6px; }
-
-.player-card {
-    background: var(--bg-box);
-    border-radius: 8px;
-    padding: 8px 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border: 1px solid var(--border-color);
-    cursor: pointer;
-    transition: all 0.2s;
-}
-.player-card:hover {
-    border-color: var(--color-primary);
-    transform: scale(1.01);
-}
-.player-card.me { border-left: 3px solid var(--color-primary); }
-
-.player-card .player-info {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-}
-.player-card .nombre { font-weight: bold; font-size: 0.95rem; color: #fff; }
-
-.player-card .player-puntos {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-}
-.player-card .puntos-total {
-    font-weight: bold;
-    font-size: 1rem;
-    color: #ffffff;
-}
-.player-card .puntos-detalle {
-    display: flex;
-    gap: 6px;
-    font-size: 0.7rem;
-}
-.player-card .puntos-simples { color: #64b5f6; }
-.player-card .puntos-grupales { color: #66bb6a; }
 
 /* SCROLLBAR */
 ::-webkit-scrollbar { width: 6px; }
@@ -412,28 +221,17 @@ h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; text-transform: upp
     body { padding: 6px; justify-content: center; }
     header { display: none; }
     .app-container { flex-direction: row; max-width: 100%; height: 98vh; align-items: stretch; gap: 8px; }
-    .board-container { flex: 1.4; padding: 8px; display: flex; flex-direction: column; }
+    .board-container { flex: 1; padding: 8px; display: flex; flex-direction: column; }
     .board { min-height: 120px; padding: 6px; }
-    .dice-cell { width: 35px; height: 35px; font-size: 1rem; }
-    .dice-cell .dice-value { font-size: 1.2rem; }
-    .side-panel { flex: 1; max-width: 250px; justify-content: flex-start; overflow-y: auto; padding-right: 4px; }
+    .dice-cell { width: 35px; height: 35px; }
+    .side-panel { flex: 0.6; max-width: 200px; }
     .scoreboard { padding: 6px 10px; }
     .scoreboard .modal-btn { font-size: 0.6rem; padding: 4px 6px; }
-    .leaderboard { max-height: 250px; padding: 8px; }
-    .player-card { padding: 6px 10px; }
-    .player-card .nombre { font-size: 0.8rem; }
-    .player-card .puntos-total { font-size: 0.8rem; }
-    .player-card .puntos-detalle { font-size: 0.6rem; }
-    #zoomBoard .dice-cell { width: 35px; height: 35px; font-size: 1rem; }
-    #zoomBoard .dice-cell .dice-value { font-size: 1.2rem; }
 }
 
 @media (max-width: 480px) {
-    .dice-cell { width: 40px; height: 40px; font-size: 1rem; }
-    .dice-cell .dice-value { font-size: 1.2rem; }
+    .dice-cell { width: 40px; height: 40px; }
     .scoreboard .modal-btn { font-size: 0.65rem; padding: 6px 8px; }
-    #zoomBoard .dice-cell { width: 40px; height: 40px; font-size: 1rem; }
-    #zoomBoard .dice-cell .dice-value { font-size: 1.2rem; }
     .modal-box { padding: 20px; }
     .modal-box h2 { font-size: 1.4rem; }
 }

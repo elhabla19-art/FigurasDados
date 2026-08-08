@@ -129,8 +129,6 @@ class DeshacerManager {
     }
 }
 
-// Crear instancia singleton
 var deshacerManager = new DeshacerManager();
 
-// Exportar para usar en otros modulos
 export { DeshacerManager, deshacerManager };

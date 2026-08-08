@@ -1,5 +1,3 @@
-// utils.js
-
 export function generarId() {
     return Math.random().toString(36).substring(2, 11);
 }
@@ -13,10 +11,12 @@ export function clonarObjeto(obj) {
 }
 
 export function shuffleArray(array) {
-    const arr = array.slice();
-    for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
+    var arr = array.slice();
+    for (var i = arr.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var temp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = temp;
     }
     return arr;
 }
@@ -27,8 +27,7 @@ export function calcularPorcentaje(actual, total) {
 }
 
 export function renderizarDado(valor) {
-    // Configuración de puntos con posiciones relativas (0-100%)
-    const configs = {
+    var configs = {
         1: { puntos: [[50, 50]] },
         2: { puntos: [[25, 25], [75, 75]] },
         3: { puntos: [[25, 25], [50, 50], [75, 75]] },
@@ -37,16 +36,18 @@ export function renderizarDado(valor) {
         6: { puntos: [[25, 25], [75, 25], [25, 50], [75, 50], [25, 75], [75, 75]] }
     };
     
-    const config = configs[valor] || configs[1];
-    const puntos = config.puntos;
-    const tamanoPunto = '20%';
+    var config = configs[valor] || configs[1];
+    var puntos = config.puntos;
+    var tamanoPunto = '20%';
     
-    let html = `<div class="dado-visual" style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; background: #2d2d2d; border-radius: 8px; padding: 2px; box-sizing: border-box; position: relative;">`;
+    var html = '<div class="dado-visual" style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; background: #2d2d2d; border-radius: 8px; padding: 2px; box-sizing: border-box; position: relative;">';
     
-    for (const [x, y] of puntos) {
-        html += `<div style="position: absolute; left: ${x}%; top: ${y}%; transform: translate(-50%, -50%); background: white; border-radius: 50%; width: ${tamanoPunto}; height: ${tamanoPunto};"></div>`;
+    for (var i = 0; i < puntos.length; i++) {
+        var x = puntos[i][0];
+        var y = puntos[i][1];
+        html += '<div style="position: absolute; left: ' + x + '%; top: ' + y + '%; transform: translate(-50%, -50%); background: white; border-radius: 50%; width: ' + tamanoPunto + '; height: ' + tamanoPunto + ';"></div>';
     }
     
-    html += `</div>`;
+    html += '</div>';
     return html;
 }
